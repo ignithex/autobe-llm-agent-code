@@ -12,6 +12,7 @@ import {
 import { AutoBeInterfacePrerequisiteEvent } from "@autobe/interface/src/events/AutoBeInterfacePrerequisiteEvent";
 import {
   AutoBeOpenApiEndpointComparator,
+  AutoBeOpenApiTypeChecker,
   missedOpenApiSchemas,
   revertOpenApiAccessor,
 } from "@autobe/utils";
@@ -32,6 +33,7 @@ import { orchestrateInterfacePrerequisite } from "./orchestrateInterfacePrerequi
 import { orchestrateInterfaceSchema } from "./orchestrateInterfaceSchema";
 import { orchestrateInterfaceSchemaCasting } from "./orchestrateInterfaceSchemaCasting";
 import { orchestrateInterfaceSchemaComplement } from "./orchestrateInterfaceSchemaComplement";
+import { orchestrateInterfaceSchemaRefine } from "./orchestrateInterfaceSchemaRefine";
 import { orchestrateInterfaceSchemaRename } from "./orchestrateInterfaceSchemaRename";
 import { orchestrateInterfaceSchemaReview } from "./orchestrateInterfaceSchemaReview";
 import { AutoBeInterfaceSchemaReviewProgrammer } from "./programmers/AutoBeInterfaceSchemaReviewProgrammer";
@@ -175,6 +177,10 @@ export const orchestrateInterface =
       completed: 0,
       total: 0,
     };
+    const refineProgress: AutoBeProgressEventBase = {
+      completed: 0,
+      total: 0,
+    };
     const reviewProgress: AutoBeProgressEventBase = {
       completed: 0,
       total: 0,
@@ -225,25 +231,32 @@ export const orchestrateInterface =
       await overwrite(await initialize());
 
       // type casting
-      if (Object.keys(schemas).length !== 0)
-        await overwrite(
-          await orchestrateInterfaceSchemaCasting(ctx, {
-            instruction: props.instruction,
-            document,
-            schemas,
-            progress: castingProgress,
-          }),
-        );
+      await overwrite(
+        await orchestrateInterfaceSchemaCasting(ctx, {
+          instruction: props.instruction,
+          document,
+          schemas,
+          progress: castingProgress,
+        }),
+      );
+
+      // refine schemas
+      await overwrite(
+        await orchestrateInterfaceSchemaRefine(ctx, {
+          instruction: props.instruction,
+          document,
+          schemas,
+          progress: refineProgress,
+        }),
+      );
 
       // review schemas
       reviewProgress.total +=
-        Object.keys(schemas).filter(
-          (k) =>
+        Object.entries(schemas).filter(
+          ([k, v]) =>
             AutoBeJsonSchemaValidator.isPreset(k) === false &&
-            AutoBeJsonSchemaValidator.isObjectType({
-              operations: document.operations,
-              typeName: k,
-            }) === true,
+            AutoBeOpenApiTypeChecker.isObject(v) &&
+            Object.keys(v.properties).length !== 0,
         ).length *
           (REVIEWERS.length - 1) +
         Object.keys(schemas).filter((k) =>
@@ -253,15 +266,14 @@ export const orchestrateInterface =
           }),
         ).length;
       for (const config of REVIEWERS)
-        if (Object.keys(schemas).length !== 0)
-          await overwrite(
-            await orchestrateInterfaceSchemaReview(ctx, config, {
-              instruction: props.instruction,
-              document,
-              schemas,
-              progress: reviewProgress,
-            }),
-          );
+        await overwrite(
+          await orchestrateInterfaceSchemaReview(ctx, config, {
+            instruction: props.instruction,
+            document,
+            schemas,
+            progress: reviewProgress,
+          }),
+        );
     };
 
     // INITIAL SCHEMAS
