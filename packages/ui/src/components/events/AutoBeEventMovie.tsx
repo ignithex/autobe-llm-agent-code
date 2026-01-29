@@ -53,6 +53,7 @@ export function AutoBeEventMovie<Event extends AutoBeEvent>(
     // SCENARIO EVENTS
     case "analyzeScenario":
     case "databaseGroup":
+    case "databaseGroupReview":
     case "interfaceGroup":
     case "realizeTestReset":
       return <AutoBeScenarioEventMovie event={back} />;
@@ -61,6 +62,8 @@ export function AutoBeEventMovie<Event extends AutoBeEvent>(
     case "analyzeReview":
     case "interfaceEndpoint":
     case "interfaceEndpointReview":
+    case "databaseAuthorization":
+    case "databaseAuthorizationReview":
     case "databaseComponent":
     case "databaseComponentReview":
     case "databaseSchema":

@@ -1,7 +1,7 @@
 import { IAgenticaController } from "@agentica/core";
 import {
+  AutoBeDatabaseAuthorizationReviewEvent,
   AutoBeDatabaseComponent,
-  AutoBeDatabaseComponentReviewEvent,
   AutoBeDatabaseComponentTableDesign,
   AutoBeDatabaseComponentTableRevise,
   AutoBeEventSource,
@@ -15,11 +15,11 @@ import { v7 } from "uuid";
 import { AutoBeContext } from "../../context/AutoBeContext";
 import { executeCachedBatch } from "../../utils/executeCachedBatch";
 import { AutoBePreliminaryController } from "../common/AutoBePreliminaryController";
-import { transformPrismaComponentReviewHistory } from "./histories/transformPrismaComponentReviewHistory";
+import { transformPrismaAuthorizationReviewHistory } from "./histories/transformPrismaAuthorizationReviewHistory";
 import { AutoBeDatabaseComponentProgrammer } from "./programmers/AutoBeDatabaseComponentProgrammer";
-import { IAutoBeDatabaseComponentReviewApplication } from "./structures/IAutoBeDatabaseComponentReviewApplication";
+import { IAutoBeDatabaseAuthorizationReviewApplication } from "./structures/IAutoBeDatabaseAuthorizationReviewApplication";
 
-export async function orchestratePrismaComponentReview(
+export async function orchestratePrismaAuthorizationReview(
   ctx: AutoBeContext,
   props: {
     instruction: string;
@@ -44,15 +44,18 @@ export async function orchestratePrismaComponentReview(
           .flatMap((c) => c.tables.map((t) => t.name)),
       );
 
-      const event: AutoBeDatabaseComponentReviewEvent = await process(ctx, {
-        component,
-        otherTableNames,
-        allTableNames,
-        instruction: props.instruction,
-        prefix,
-        progress,
-        promptCacheKey,
-      });
+      const event: AutoBeDatabaseAuthorizationReviewEvent = await process(
+        ctx,
+        {
+          component,
+          otherTableNames,
+          allTableNames,
+          instruction: props.instruction,
+          prefix,
+          progress,
+          promptCacheKey,
+        },
+      );
       ctx.dispatch(event);
       return event.modification;
     }),
@@ -71,12 +74,12 @@ async function process(
     progress: AutoBeProgressEventBase;
     promptCacheKey: string;
   },
-): Promise<AutoBeDatabaseComponentReviewEvent> {
+): Promise<AutoBeDatabaseAuthorizationReviewEvent> {
   const preliminary: AutoBePreliminaryController<
     "analysisFiles" | "previousAnalysisFiles" | "previousDatabaseSchemas"
   > = new AutoBePreliminaryController({
     application:
-      typia.json.application<IAutoBeDatabaseComponentReviewApplication>(),
+      typia.json.application<IAutoBeDatabaseAuthorizationReviewApplication>(),
     source: SOURCE,
     kinds: [
       "analysisFiles",
@@ -87,7 +90,7 @@ async function process(
   });
 
   return preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeDatabaseComponentReviewApplication.IComplete | null> =
+    const pointer: IPointer<IAutoBeDatabaseAuthorizationReviewApplication.IComplete | null> =
       { value: null };
 
     const result: AutoBeContext.IResult = await ctx.conversate({
@@ -95,14 +98,13 @@ async function process(
       controller: createController({
         preliminary,
         otherTableNames: props.otherTableNames,
-        prefix: props.prefix,
         build: (next) => {
           pointer.value = next;
         },
       }),
       enforceFunctionCall: true,
       promptCacheKey: props.promptCacheKey,
-      ...transformPrismaComponentReviewHistory({
+      ...transformPrismaAuthorizationReviewHistory({
         component: props.component,
         allTableNames: props.allTableNames,
         instruction: props.instruction,
@@ -181,14 +183,17 @@ function createController(props: {
     "analysisFiles" | "previousAnalysisFiles" | "previousDatabaseSchemas"
   >;
   otherTableNames: Set<string>;
-  prefix: string | null;
-  build: (next: IAutoBeDatabaseComponentReviewApplication.IComplete) => void;
+  build: (
+    next: IAutoBeDatabaseAuthorizationReviewApplication.IComplete,
+  ) => void;
 }): IAgenticaController.IClass {
   const validate = (
     input: unknown,
-  ): IValidation<IAutoBeDatabaseComponentReviewApplication.IProps> => {
-    const result: IValidation<IAutoBeDatabaseComponentReviewApplication.IProps> =
-      typia.validate<IAutoBeDatabaseComponentReviewApplication.IProps>(input);
+  ): IValidation<IAutoBeDatabaseAuthorizationReviewApplication.IProps> => {
+    const result: IValidation<IAutoBeDatabaseAuthorizationReviewApplication.IProps> =
+      typia.validate<IAutoBeDatabaseAuthorizationReviewApplication.IProps>(
+        input,
+      );
     if (result.success === false) return result;
 
     if (result.data.request.type !== "complete")
@@ -197,26 +202,11 @@ function createController(props: {
         request: result.data.request,
       });
 
-    // validate revise prefix
-    const errors: IValidation.IError[] = [];
-    const tableNames: string[] = result.data.request.revises
-      .map((r) =>
-        r.type === "create" ? r.table : r.type === "update" ? r.updated : null,
-      )
-      .filter((name): name is string => name !== null);
-    AutoBeDatabaseComponentProgrammer.validatePrefix({
-      errors,
-      path: "request.revises",
-      prefix: props.prefix,
-      tableNames,
-    });
-    if (errors.length > 0) return { success: false, data: result.data, errors };
-
     return result;
   };
 
   const application: ILlmApplication = props.preliminary.fixApplication(
-    typia.llm.application<IAutoBeDatabaseComponentReviewApplication>({
+    typia.llm.application<IAutoBeDatabaseAuthorizationReviewApplication>({
       validate: {
         process: validate,
       },
@@ -231,8 +221,8 @@ function createController(props: {
       process: (next) => {
         if (next.request.type === "complete") props.build(next.request);
       },
-    } satisfies IAutoBeDatabaseComponentReviewApplication,
+    } satisfies IAutoBeDatabaseAuthorizationReviewApplication,
   };
 }
 
-const SOURCE = "databaseComponentReview" satisfies AutoBeEventSource;
+const SOURCE = "databaseAuthorizationReview" satisfies AutoBeEventSource;

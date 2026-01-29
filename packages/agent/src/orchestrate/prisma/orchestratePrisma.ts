@@ -11,15 +11,19 @@ import {
   IAutoBeDatabaseValidation,
 } from "@autobe/interface";
 import { writePrismaApplication } from "@autobe/utils";
+import { NamingConvention } from "typia/lib/utils/NamingConvention";
 import { v7 } from "uuid";
 
 import { AutoBeContext } from "../../context/AutoBeContext";
 import { predicateStateMessage } from "../../utils/predicateStateMessage";
 import { IAutoBeFacadeApplicationProps } from "../facade/histories/IAutoBeFacadeApplicationProps";
+import { orchestratePrismaAuthorization } from "./orchestratePrismaAuthorization";
+import { orchestratePrismaAuthorizationReview } from "./orchestratePrismaAuthorizationReview";
 import { orchestratePrismaComponent } from "./orchestratePrismaComponent";
 import { orchestratePrismaComponentReview } from "./orchestratePrismaComponentReview";
 import { orchestratePrismaCorrect } from "./orchestratePrismaCorrect";
 import { orchestratePrismaGroup } from "./orchestratePrismaGroup";
+import { orchestratePrismaGroupReview } from "./orchestratePrismaGroupReview";
 import { orchestratePrismaSchema } from "./orchestratePrismaSchema";
 import { orchestratePrismaSchemaReview } from "./orchestratePrismaSchemaReview";
 
@@ -49,29 +53,60 @@ export const orchestratePrisma = async (
     step: ctx.state().analyze?.step ?? 0,
   });
 
+  // NORMALIZE PREFIX
+  const analyze = ctx.state().analyze;
+  if (analyze?.prefix) {
+    analyze.prefix = NamingConvention.snake(analyze.prefix);
+  }
+
   // GROUPS
   const groups: AutoBeDatabaseGroup[] = await orchestratePrismaGroup(
     ctx,
     props.instruction,
   );
-  const components: AutoBeDatabaseComponent[] =
-    await orchestratePrismaComponent(ctx, {
+  const reviewedGroups: AutoBeDatabaseGroup[] =
+    await orchestratePrismaGroupReview(ctx, {
       instruction: props.instruction,
       groups,
     });
 
-  // COMPONENT REVIEW (each event is dispatched inside)
+  // AUTHORIZATION
+  const authorizations: AutoBeDatabaseComponent[] =
+    await orchestratePrismaAuthorization(ctx, {
+      instruction: props.instruction,
+      groups: reviewedGroups,
+    });
+  const reviewedAuthorizations: AutoBeDatabaseComponent[] =
+    await orchestratePrismaAuthorizationReview(ctx, {
+      instruction: props.instruction,
+      components: authorizations,
+    });
+
+  // COMPONENT
+  const components: AutoBeDatabaseComponent[] =
+    await orchestratePrismaComponent(ctx, {
+      instruction: props.instruction,
+      groups: reviewedGroups,
+    });
   const reviewedComponents: AutoBeDatabaseComponent[] =
     await orchestratePrismaComponentReview(ctx, {
       instruction: props.instruction,
       components,
     });
+  const reviewedAllComponents: AutoBeDatabaseComponent[] = [
+    ...reviewedAuthorizations,
+    ...reviewedComponents,
+  ];
 
   // CONSTRUCT AST DATA
   const schemaEvents: AutoBeDatabaseSchemaEvent[] =
-    await orchestratePrismaSchema(ctx, props.instruction, reviewedComponents);
+    await orchestratePrismaSchema(
+      ctx,
+      props.instruction,
+      reviewedAllComponents,
+    );
   const application: AutoBeDatabase.IApplication = {
-    files: reviewedComponents.map((comp) => ({
+    files: reviewedAllComponents.map((comp) => ({
       filename: comp.filename,
       namespace: comp.namespace,
       models: schemaEvents
@@ -82,7 +117,11 @@ export const orchestratePrisma = async (
 
   // REVIEW
   const reviewEvents: AutoBeDatabaseSchemaReviewEvent[] =
-    await orchestratePrismaSchemaReview(ctx, application, reviewedComponents);
+    await orchestratePrismaSchemaReview(
+      ctx,
+      application,
+      reviewedAllComponents,
+    );
   for (const event of reviewEvents) {
     if (event.content === null) continue;
 

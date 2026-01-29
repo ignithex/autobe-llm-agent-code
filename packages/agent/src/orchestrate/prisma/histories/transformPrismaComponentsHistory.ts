@@ -1,6 +1,5 @@
 import { AutoBeDatabaseGroup } from "@autobe/interface";
 import { StringUtil } from "@autobe/utils";
-import { NamingConvention } from "typia/lib/utils/NamingConvention";
 import { v7 } from "uuid";
 
 import { AutoBeSystemPromptConstant } from "../../../constants/AutoBeSystemPromptConstant";
@@ -22,7 +21,6 @@ export const transformPrismaComponentsHistory = (
   if (state.analyze === null)
     // unreachable
     throw new Error("Analyze state is not set.");
-  if (props.prefix) props.prefix = NamingConvention.snake(props.prefix);
   return {
     histories: [
       {
@@ -79,21 +77,30 @@ export const transformPrismaComponentsHistory = (
           ${
             state.analyze.actors.length > 0
               ? StringUtil.trim`
-                  ## User Actor Handling
+                  ## ABSOLUTE PROHIBITION: Actor and Authorization Tables
 
-                  The Requirement Analysis Report contains the following user actors: ${state.analyze.actors.join(", ")}
+                  The requirements contain the following actors: ${state.analyze.actors.map((a) => a.name).join(", ")}
 
-                  **Do not normalize** user actors into a single table.
-                  Instead, create separate tables for each distinct actor mentioned in the requirements.
+                  **YOU MUST NOT CREATE ANY ACTOR OR AUTHENTICATION TABLES.**
 
-                  Create separate tables for each actor:
+                  The **Database Authorization Agent** is responsible for generating all actor-related tables.
+                  That agent creates the \`schema-02-actors.prisma\` component with tables like:
 
                   ${state.analyze.actors
                     .map(
                       (actor) =>
-                        `- ${props.prefix}_${actor.name.toLowerCase()}`,
+                        `- ${props.prefix ? props.prefix + "_" : ""}${actor.name.toLowerCase()}s (FORBIDDEN - created by Authorization Agent)
+- ${props.prefix ? props.prefix + "_" : ""}${actor.name.toLowerCase()}_sessions (FORBIDDEN - created by Authorization Agent)`,
                     )
                     .join("\n")}
+
+                  **What To Do Instead**:
+                  - Create business domain tables that REFERENCE actors via foreign keys
+                  - ASSUME actor tables already exist
+                  - NEVER create the actor table itself
+
+                  **If you receive an "Actors" component skeleton**, return an EMPTY tables array:
+                  \`{ type: "complete", analysis: "Actors handled by Authorization Agent", rationale: "Skipped", tables: [] }\`
                 `
               : ""
           }

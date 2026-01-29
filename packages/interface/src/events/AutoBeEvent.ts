@@ -5,11 +5,14 @@ import { AutoBeAnalyzeStartEvent } from "./AutoBeAnalyzeStartEvent";
 import { AutoBeAnalyzeWriteEvent } from "./AutoBeAnalyzeWriteEvent";
 import { AutoBeAssistantMessageEvent } from "./AutoBeAssistantMessageEvent";
 import { AutoBeConsentFunctionCallEvent } from "./AutoBeConsentFunctionCallEvent";
+import { AutoBeDatabaseAuthorizationEvent } from "./AutoBeDatabaseAuthorizationEvent";
+import { AutoBeDatabaseAuthorizationReviewEvent } from "./AutoBeDatabaseAuthorizationReviewEvent";
 import { AutoBeDatabaseCompleteEvent } from "./AutoBeDatabaseCompleteEvent";
 import { AutoBeDatabaseComponentEvent } from "./AutoBeDatabaseComponentEvent";
 import { AutoBeDatabaseComponentReviewEvent } from "./AutoBeDatabaseComponentReviewEvent";
 import { AutoBeDatabaseCorrectEvent } from "./AutoBeDatabaseCorrectEvent";
 import { AutoBeDatabaseGroupEvent } from "./AutoBeDatabaseGroupEvent";
+import { AutoBeDatabaseGroupReviewEvent } from "./AutoBeDatabaseGroupReviewEvent";
 import { AutoBeDatabaseSchemaEvent } from "./AutoBeDatabaseSchemaEvent";
 import { AutoBeDatabaseSchemaReviewEvent } from "./AutoBeDatabaseSchemaReviewEvent";
 import { AutoBeDatabaseStartEvent } from "./AutoBeDatabaseStartEvent";
@@ -108,6 +111,9 @@ export type AutoBeEvent =
   // DATABASE
   | AutoBeDatabaseStartEvent
   | AutoBeDatabaseGroupEvent
+  | AutoBeDatabaseGroupReviewEvent
+  | AutoBeDatabaseAuthorizationEvent
+  | AutoBeDatabaseAuthorizationReviewEvent
   | AutoBeDatabaseComponentEvent
   | AutoBeDatabaseComponentReviewEvent
   | AutoBeDatabaseSchemaEvent

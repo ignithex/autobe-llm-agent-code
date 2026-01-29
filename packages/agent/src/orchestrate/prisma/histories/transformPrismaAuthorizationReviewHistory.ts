@@ -1,13 +1,12 @@
 import { AutoBeDatabaseComponent } from "@autobe/interface";
 import { StringUtil } from "@autobe/utils";
-import { NamingConvention } from "typia/lib/utils/NamingConvention";
 import { v7 } from "uuid";
 
 import { AutoBeSystemPromptConstant } from "../../../constants/AutoBeSystemPromptConstant";
 import { IAutoBeOrchestrateHistory } from "../../../structures/IAutoBeOrchestrateHistory";
 import { AutoBePreliminaryController } from "../../common/AutoBePreliminaryController";
 
-export const transformPrismaComponentReviewHistory = (props: {
+export const transformPrismaAuthorizationReviewHistory = (props: {
   preliminary: AutoBePreliminaryController<
     "analysisFiles" | "previousAnalysisFiles" | "previousDatabaseSchemas"
   >;
@@ -21,13 +20,13 @@ export const transformPrismaComponentReviewHistory = (props: {
       id: v7(),
       created_at: new Date().toISOString(),
       type: "systemMessage",
-      text: AutoBeSystemPromptConstant.DATABASE_COMPONENT,
+      text: AutoBeSystemPromptConstant.DATABASE_AUTHORIZATION,
     },
     {
       id: v7(),
       created_at: new Date().toISOString(),
       type: "systemMessage",
-      text: AutoBeSystemPromptConstant.DATABASE_COMPONENT_REVIEW,
+      text: AutoBeSystemPromptConstant.DATABASE_AUTHORIZATION_REVIEW,
     },
     ...props.preliminary.getHistories(),
     {
@@ -35,9 +34,9 @@ export const transformPrismaComponentReviewHistory = (props: {
       created_at: new Date().toISOString(),
       type: "assistantMessage",
       text: StringUtil.trim`
-        ## Component to Review
+        ## Authorization Component to Review
 
-        ${props.prefix !== null ? `**Table Prefix**: \`${NamingConvention.snake(props.prefix)}\`` : ""}
+        ${props.prefix !== null ? `**Table Prefix**: \`${props.prefix}\`` : ""}
 
         ### Target Component
 
@@ -46,13 +45,13 @@ export const transformPrismaComponentReviewHistory = (props: {
 
         ### Current Tables
 
-        The following tables are currently assigned to this component:
+        The following tables are currently assigned to this authorization component:
 
         ${JSON.stringify(props.component.tables, null, 2)}
 
         ### Tables in Other Components (For Reference)
 
-        These tables belong to OTHER components' domains. Focus on YOUR domain only:
+        These tables belong to OTHER components' domains. Focus on YOUR authorization domain only:
 
         ${JSON.stringify(props.allTableNames.filter((t) => !props.component.tables.some((ct) => ct.name === t)).sort())}
 
@@ -63,20 +62,20 @@ export const transformPrismaComponentReviewHistory = (props: {
     },
   ],
   userMessage: StringUtil.trim`
-    Review the "${props.component.namespace}" component's table list and apply necessary revisions.
+    Review the "${props.component.namespace}" authorization component's table list and apply necessary revisions.
 
-    **IMPORTANT - Domain Boundary Rule**:
-    Only CREATE tables that CLEARLY belong to the "${props.component.namespace}" domain.
-    If a table could belong to another domain → DO NOT CREATE (let that domain's agent handle it).
+    **IMPORTANT - Authorization Domain Rule**:
+    Only CREATE tables related to authentication and authorization.
+    Do NOT create business domain tables (orders, products, etc.).
 
-    1. First, fetch analysis files using \`getAnalysisFiles\` to understand requirements
-    2. Identify issues: missing tables, naming problems, or misplaced tables
+    1. First, fetch analysis files using \`getAnalysisFiles\` to understand authentication requirements
+    2. Verify each actor has: main actor table + session table + auth support tables
     3. Call \`process({ request: { type: "complete", revises: [...] } })\` with your revisions
 
     Use revises to:
-    - **Create**: Add missing tables that CLEARLY belong to THIS component's domain
+    - **Create**: Add missing authentication tables (session tables, password reset, etc.)
     - **Update**: Rename tables with naming convention issues
-    - **Erase**: Remove tables that belong to other components
+    - **Erase**: Remove tables that are not related to authentication/authorization
 
     If no changes are needed, return an empty revises array.
   `,
