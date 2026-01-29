@@ -66,15 +66,20 @@ export async function orchestrateInterfaceSchema(
           (op.requestBody && predicate(op.requestBody.typeName)) ||
           (op.responseBody && predicate(op.responseBody.typeName)),
       );
-      const row: AutoBeOpenApi.IJsonSchemaDescriptive = await process(ctx, {
-        operations,
-        progress,
-        otherTypeNames: typeNames.filter((k) => k !== it),
-        promptCacheKey,
-        typeName: it,
-        instruction: props.instruction,
-      });
-      x[it] = row;
+      try {
+        const row: AutoBeOpenApi.IJsonSchemaDescriptive = await process(ctx, {
+          operations,
+          progress,
+          otherTypeNames: typeNames.filter((k) => k !== it),
+          promptCacheKey,
+          typeName: it,
+          instruction: props.instruction,
+        });
+        x[it] = row;
+      } catch (error) {
+        ++progress.completed;
+        console.log("interfaceSchema failure", it, error);
+      }
     }),
   );
   return x;
