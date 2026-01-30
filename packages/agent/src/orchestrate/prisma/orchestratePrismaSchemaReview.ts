@@ -6,7 +6,6 @@ import {
   AutoBeEventSource,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { StringUtil } from "@autobe/utils";
 import { ILlmApplication, IValidation } from "@samchon/openapi";
 import { IPointer } from "tstl";
 import typia from "typia";
@@ -16,7 +15,7 @@ import { AutoBeContext } from "../../context/AutoBeContext";
 import { executeCachedBatch } from "../../utils/executeCachedBatch";
 import { AutoBePreliminaryController } from "../common/AutoBePreliminaryController";
 import { transformPrismaSchemaReviewHistory } from "./histories/transformPrismaSchemaReviewHistory";
-import { AutoBeDatabaseModelProgrammer } from "./programmers/AutoBeDatabaseModelProgrammer";
+import { AutoBeDatabaseSchemaProgrammer } from "./programmers/AutoBeDatabaseSchemaProgrammer";
 import { IAutoBeDatabaseSchemaReviewApplication } from "./structures/IAutoBeDatabaseSchemaReviewApplication";
 
 export async function orchestratePrismaSchemaReview(
@@ -57,6 +56,9 @@ export async function orchestratePrismaSchemaReview(
             application,
             component: task.component,
             model: task.model,
+            otherModels: application.files
+              .flatMap((f) => f.models)
+              .filter((m) => m.name !== task.model.name),
             progress,
             promptCacheKey,
           });
@@ -75,6 +77,7 @@ async function step(
     application: AutoBeDatabase.IApplication;
     component: AutoBeDatabaseComponent;
     model: AutoBeDatabase.IModel;
+    otherModels: AutoBeDatabase.IModel[];
     progress: AutoBeProgressEventBase;
     promptCacheKey: string;
   },
@@ -119,20 +122,20 @@ async function step(
           pointer.value = next;
         },
         targetComponent: props.component,
-        targetTable: props.model.name,
+        model: props.model,
+        otherModels: props.otherModels,
       }),
       enforceFunctionCall: true,
       promptCacheKey: props.promptCacheKey,
       ...transformPrismaSchemaReviewHistory({
         component: props.component,
         model: props.model,
+        otherModels: props.otherModels,
         preliminary,
       }),
     });
     if (pointer.value === null) return out(result)(null);
 
-    if (pointer.value.content !== null)
-      AutoBeDatabaseModelProgrammer.emend(pointer.value.content);
     const event: AutoBeDatabaseSchemaReviewEvent = {
       type: SOURCE,
       id: v7(),
@@ -162,7 +165,8 @@ function createController(props: {
   >;
   build: (next: IAutoBeDatabaseSchemaReviewApplication.IComplete) => void;
   targetComponent: AutoBeDatabaseComponent;
-  targetTable: string;
+  model: AutoBeDatabase.IModel;
+  otherModels: AutoBeDatabase.IModel[];
 }): IAgenticaController.IClass {
   const validate = (
     input: unknown,
@@ -176,39 +180,29 @@ function createController(props: {
         request: result.data.request,
       });
     else if (result.data.request.content === null) return result;
+    else if (
+      result.data.request.content !== null &&
+      result.data.request.content.length === 0
+    )
+      result.data.request.content = null;
 
-    const actual: AutoBeDatabase.IModel = result.data.request.content;
-    const expected: string = props.targetTable;
+    const errors: IValidation.IError[] = [];
+    if (result.data.request.content !== null)
+      AutoBeDatabaseSchemaProgrammer.validate({
+        path: "$input.request.content",
+        errors,
+        targetTable: props.model.name,
+        otherTables: props.otherModels.map((m) => m.name),
+        models: result.data.request.content,
+      });
 
-    if (actual.name === expected) return result;
-    return {
-      success: false,
-      data: result.data,
-      errors: [
-        {
-          path: "$input.request.content.name",
-          value: actual.name,
-          expected: JSON.stringify(expected),
-          description: StringUtil.trim`
-            You modified a model with the wrong table name.
-
-            You are responsible for reviewing exactly ONE table with the exact name specified.
-
-            - filename: current domain's filename
-            - namespace: current domain's namespace
-            - expected table name: ${expected}
-            - actual table name: ${actual.name}
-
-            ${JSON.stringify({
-              filename: props.targetComponent.filename,
-              namespace: props.targetComponent.namespace,
-              targetTable: expected,
-              actualTableName: actual.name,
-            })}
-          `,
-        },
-      ],
-    };
+    if (errors.length !== 0)
+      return {
+        success: false,
+        data: result.data,
+        errors,
+      };
+    return result;
   };
 
   const application: ILlmApplication = props.preliminary.fixApplication(
