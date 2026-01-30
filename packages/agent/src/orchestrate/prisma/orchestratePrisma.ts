@@ -7,6 +7,7 @@ import {
   AutoBeDatabaseHistory,
   AutoBeDatabaseSchemaEvent,
   AutoBeDatabaseSchemaReviewEvent,
+  AutoBeProgressEventBase,
   IAutoBeCompiler,
   IAutoBeDatabaseValidation,
 } from "@autobe/interface";
@@ -118,25 +119,38 @@ export const orchestratePrisma = async (
   };
 
   // REVIEW
-  const reviewEvents: AutoBeDatabaseSchemaReviewEvent[] =
-    await orchestratePrismaSchemaReview(
-      ctx,
-      application,
-      reviewedAllComponents,
-    );
-  for (const event of reviewEvents) {
-    if (event.content === null) continue;
+  const reviewProgress: AutoBeProgressEventBase = {
+    completed: 0,
+    total: 0,
+  };
+  const reviewedModelNames: Set<string> = new Set();
+  while (
+    application.files
+      .flatMap((f) => f.models)
+      .every((m) => reviewedModelNames.has(m.name)) === false
+  ) {
+    const reviewEvents: AutoBeDatabaseSchemaReviewEvent[] =
+      await orchestratePrismaSchemaReview(ctx, {
+        application,
+        components: reviewedAllComponents,
+        reviewed: reviewedModelNames,
+        progress: reviewProgress,
+      });
+    for (const event of reviewEvents) {
+      reviewedModelNames.add(event.modelName);
+      if (event.content === null) continue;
 
-    const models: AutoBeDatabase.IModel[] = event.content;
-    const file: AutoBeDatabase.IFile | undefined = application.files.find(
-      (f) => f.namespace === event.namespace,
-    );
-    if (file === undefined) continue;
+      const models: AutoBeDatabase.IModel[] = event.content;
+      const file: AutoBeDatabase.IFile | undefined = application.files.find(
+        (f) => f.namespace === event.namespace,
+      );
+      if (file === undefined) continue;
 
-    for (const x of models) {
-      const index: number = file.models.findIndex((y) => x.name === y.name);
-      if (index !== -1) file.models[index] = x;
-      else file.models.push(x);
+      for (const x of models) {
+        const index: number = file.models.findIndex((y) => x.name === y.name);
+        if (index !== -1) file.models[index] = x;
+        else file.models.push(x);
+      }
     }
   }
 
