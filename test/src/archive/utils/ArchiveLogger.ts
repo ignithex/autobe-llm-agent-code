@@ -141,7 +141,9 @@ export namespace ArchiveLogger {
         `    - update: ${event.revises.filter((r) => r.type === "update").length}`,
         ...event.revises
           .filter((r) => r.type === "update")
-          .map((r) => `      - ${r.original_namespace} => ${r.group.namespace}`),
+          .map(
+            (r) => `      - ${r.original_namespace} => ${r.group.namespace}`,
+          ),
         `    - erase: ${event.revises.filter((r) => r.type === "erase").length}`,
         ...event.revises
           .filter((r) => r.type === "erase")
@@ -247,6 +249,17 @@ export namespace ArchiveLogger {
         `  - typeName: ${event.typeName}`,
         `  - original: ${JSON.stringify(event.original)}`,
         `  - refined: ${!!event.refined}`,
+      );
+    else if (event.type === "interfaceSchemaRefine")
+      content.push(
+        `  - typeName: ${event.typeName}`,
+        `  - databaseSchema: ${event.databaseSchema}`,
+        `  - specification: ${JSON.stringify(event.specification)}`,
+        `  - refines:`,
+        ...event.refines.map(
+          (r) =>
+            `    - ${r.key}: ${r.type === "erase" ? "erased" : `${r.databaseSchemaProperty} -> ${JSON.stringify(r.specification)}`}`,
+        ),
       );
     else if (event.type === "interfaceSchemaReview")
       content.push(
