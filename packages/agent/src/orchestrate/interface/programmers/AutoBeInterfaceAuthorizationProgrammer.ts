@@ -1,10 +1,25 @@
 import { AutoBeAnalyzeActor, AutoBeOpenApi } from "@autobe/interface";
 import { StringUtil } from "@autobe/utils";
+import { singular } from "pluralize";
 import typia, { IValidation } from "typia";
+import { NamingConvention } from "typia/lib/utils/NamingConvention";
 
 import { AutoBeInterfaceOperationProgrammer } from "./AutoBeInterfaceOperationProgrammer";
 
 export namespace AutoBeInterfaceAuthorizationProgrammer {
+  export const getTypeName = (props: {
+    prefix: string | null;
+    actor: string;
+  }): string => {
+    return ["I", ...(props.prefix ? [props.prefix] : []), props.actor]
+      .map((s) => NamingConvention.pascal(singular(s)))
+      .join("");
+  };
+  export const getSessionTypeName = (props: {
+    prefix: string | null;
+    actor: string;
+  }): string => `${getTypeName(props)}Session`;
+
   export const filter = (props: {
     actor: string;
     operation: AutoBeOpenApi.IOperation;
@@ -34,6 +49,7 @@ export namespace AutoBeInterfaceAuthorizationProgrammer {
   export const validateOperation = (props: {
     operation: AutoBeOpenApi.IOperation;
     actor: AutoBeAnalyzeActor;
+    prefix: string | null;
     accessor: string;
     errors: IValidation.IError[];
   }): void => {
@@ -46,19 +62,6 @@ export namespace AutoBeInterfaceAuthorizationProgrammer {
 
     // check authorization type
     if (props.operation.authorizationType === null) return;
-
-    // path parameters must be empty
-    if (props.operation.parameters.length !== 0)
-      props.errors.push({
-        path: `${props.accessor}.parameters`,
-        expected: "[] (no parameters allowed for authorization operations)",
-        value: props.operation.parameters,
-        description: StringUtil.trim`
-          Authorization operations cannot have parameters. 
-          
-          All necessary data must be provided in the request body.
-        `,
-      });
 
     // check for which actor is specified
     if (props.operation.authorizationActor !== props.actor.name)
@@ -81,89 +84,118 @@ export namespace AutoBeInterfaceAuthorizationProgrammer {
         `,
       });
 
-    // validate request body
     if (
-      props.operation.authorizationType === "join" ||
-      props.operation.authorizationType === "login" ||
-      props.operation.authorizationType === "refresh"
-    ) {
-      const expected: string =
-        props.operation.authorizationType === "login"
-          ? "ILogin"
-          : props.operation.authorizationType === "join"
-            ? "IJoin"
-            : "IRefresh";
-      if (props.operation.requestBody === null)
-        props.errors.push({
-          path: `${props.accessor}.requestBody`,
-          expected: `AutoBeOpenApi.IRequestBody`,
-          value: props.operation.requestBody,
-          description: StringUtil.trim`
-            Request body is required for authentication ${props.operation.authorizationType} operation.
+      props.operation.authorizationType !== "join" &&
+      props.operation.authorizationType !== "login" &&
+      props.operation.authorizationType !== "refresh"
+    )
+      return;
 
-            Define it with typeName and description fields. Note that, the typeName must end with ".${expected}" 
-            
-            (e.g., IUser.${expected}, IAdmin.${expected}).
-          `,
-        });
-      else if (
-        props.operation.requestBody.typeName.endsWith(`.${expected}`) === false
-      )
-        props.errors.push({
-          path: `${props.accessor}.requestBody.typeName`,
-          expected: `Type name must be I{RoleName(PascalCase)}.${expected}`,
-          value: props.operation.requestBody.typeName,
-          description: StringUtil.trim`
-            Wrong request body type name: ${props.operation.requestBody.typeName}
+    // path parameters must be empty
+    if (props.operation.parameters.length !== 0)
+      props.errors.push({
+        path: `${props.accessor}.parameters`,
+        expected: "[] // (empty array)",
+        value: props.operation.parameters,
+        description: StringUtil.trim`
+          Authorization operations (join/login/refresh) cannot have 
+          path parameters. All necessary data must be provided in 
+          the request body.
 
-            For authentication ${props.operation.authorizationType} operation, 
-            the request body type name must follow the convention 
-            "I{RoleName}.${expected}".
+          Remove the parameters from the operation.
 
-            This standardized naming convention ensures consistency across all authentication 
-            endpoints and clearly identifies ${props.operation.authorizationType} request types.
-            The actor name should be in PascalCase format 
-            
-            (e.g., IUser.${expected}, IAdmin.${expected}, ISeller.${expected}).
-          `,
-        });
+          Also ensure the following properties are correct:
 
-      // validate response body
-      if (props.operation.responseBody === null)
-        props.errors.push({
-          path: `${props.accessor}.responseBody`,
-          expected: `AutoBeOpenApi.IResponseBody`,
-          value: props.operation.responseBody,
-          description: StringUtil.trim`
-            Response body is required for authentication operations.
-            The responseBody must contain description and typeName fields.
-            
-            "AutoBeOpenApi.IResponseBody.typeName" must be 
-            "I{Prefix(PascalCase)}{RoleName(PascalCase)}.IAuthorized", and
-            "description" must be a detailed description of the response body.
-          `,
-        });
-      else if (
-        props.operation.responseBody.typeName.endsWith(".IAuthorized") === false
-      )
-        props.errors.push({
-          path: `${props.accessor}.responseBody.typeName`,
-          expected: "`${string}.IAuthorized`",
-          value: props.operation.responseBody.typeName,
-          description: StringUtil.trim`
-            Wrong response body type name: ${props.operation.responseBody.typeName}
+          - AutoBeOpenApi.IOperation.specification
+          - AutoBeOpenApi.IOperation.description
+          - AutoBeOpenApi.IOperation.requestBody
+          - AutoBeOpenApi.IOperation.responseBody
+        `,
+      });
 
-            For authentication operations (login, join, refresh), the response body type name 
-            must follow the convention "I{RoleName}.IAuthorized".
+    // special authorization cases
+    const typeName: string = getTypeName({
+      prefix: props.prefix,
+      actor: props.actor.name,
+    });
 
-            This standardized naming convention ensures consistency across all 
-            authentication endpoints and clearly identifies authorization response types.
-            
-            The actor name should be in PascalCase format 
-            (e.g., IUser.IAuthorized, IAdmin.IAuthorized, ISeller.IAuthorized).
-          `,
-        });
-    }
+    // validate request body
+    const requestTypeName: string = `${typeName}.${
+      props.operation.authorizationType === "login"
+        ? "ILogin"
+        : props.operation.authorizationType === "join"
+          ? "IJoin"
+          : "IRefresh"
+    }`;
+    if (props.operation.requestBody === null)
+      props.errors.push({
+        path: `${props.accessor}.requestBody`,
+        expected: `AutoBeOpenApi.IRequestBody // typeName: ${requestTypeName}`,
+        value: props.operation.requestBody,
+        description: StringUtil.trim`
+          Request body is required for authentication 
+          ${props.operation.authorizationType} operation.
+
+          Write the requestBody with typeName exactly "${requestTypeName}".
+
+          Also ensure the following properties are correct:
+          
+          - AutoBeOpenApi.IOperation.specification
+          - AutoBeOpenApi.IOperation.description
+        `,
+      });
+    else if (props.operation.requestBody.typeName !== requestTypeName)
+      props.errors.push({
+        path: `${props.accessor}.requestBody.typeName`,
+        expected: `AutoBeOpenApi.IOperation with requestBody.typeName: ${requestTypeName}`,
+        value: props.operation.requestBody.typeName,
+        description: StringUtil.trim`
+          Wrong request body type name: "${props.operation.requestBody.typeName}"
+
+          Fix the requestBody.typeName to exactly "${requestTypeName}".
+
+          Also ensure the following properties are correct:
+          
+          - AutoBeOpenApi.IOperation.specification
+          - AutoBeOpenApi.IOperation.description
+          - AutoBeOpenApi.IOperation.requestBody.description
+        `,
+      });
+
+    // validate response body
+    const responseTypeName: string = `${typeName}.IAuthorized`;
+    if (props.operation.responseBody === null)
+      props.errors.push({
+        path: `${props.accessor}.responseBody`,
+        expected: `AutoBeOpenApi.IResponseBody // typeName: ${responseTypeName}`,
+        value: props.operation.responseBody,
+        description: StringUtil.trim`
+          Response body is required for authentication ${props.operation.authorizationType} operation.
+
+          Write the responseBody with typeName exactly "${responseTypeName}".
+
+          Also ensure the following properties are correct:
+          
+          - AutoBeOpenApi.IOperation.specification
+          - AutoBeOpenApi.IOperation.description
+        `,
+      });
+    else if (props.operation.responseBody.typeName !== responseTypeName)
+      props.errors.push({
+        path: `${props.accessor}.responseBody.typeName`,
+        expected: JSON.stringify(responseTypeName),
+        value: props.operation.responseBody.typeName,
+        description: StringUtil.trim`
+          Wrong response body type name: "${props.operation.responseBody.typeName}"
+
+          Fix the responseBody.typeName to exactly "${responseTypeName}".
+          Also ensure the following properties are correct:
+
+          - AutoBeOpenApi.IOperation.specification
+          - AutoBeOpenApi.IOperation.description
+          - AutoBeOpenApi.IOperation.responseBody.description
+        `,
+      });
   };
 
   export const validateAuthorizationTypes = (props: {

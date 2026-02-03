@@ -88,157 +88,91 @@ thinking: "Updated /guest to /guests, /article to /articles, /member to /members
 
 ### 3.1. Authorization Type Validation (CRITICAL)
 
-**You MUST check all endpoints for correct `authorizationType` values.**
+**All endpoints from Base Endpoint Agent MUST have `authorizationType: null`.**
 
-Scan the provided endpoints and find any that match the patterns below but have `authorizationType: null`. These endpoints MUST be updated with the correct `authorizationType`.
+The Base Endpoint Agent generates only business CRUD endpoints. Authentication operations (registration/join, login, token refresh, password management - any operation with non-null `authorizationType`) are handled by the **Authorization Agent**, not the Base Endpoint Agent.
 
-**Detection Pattern**:
-| Pattern | Required `authorizationType` |
-|---------|------------------------------|
-| Path ends with `*/login` | `"login"` |
-| Path ends with `*/join` | `"join"` |
-| Path ends with `*/refresh` | `"refresh"` |
-| `*/session`, `*/sessions`, `*/sessions/*` | `"session"` |
-| `*/password`, `*/password/*` | `"password"` |
-| **POST `/{actors}`** (actor table create) | `"join"` |
-| Other `/auth/*` paths (logout, verify, 2fa, oauth, me) | `"management"` |
-| All other paths | `null` |
+**If you see any non-null `authorizationType` values, DELETE them**:
 
-**Actor Table Create = Join**:
-
-When you see a `POST` endpoint for an **actor table** (users, members, admins, guests, etc.), this is user registration and MUST have `authorizationType: "join"`.
-
-```
-// Actor table create endpoints - these are registration endpoints
-POST /members          → authorizationType: "join"
-POST /users            → authorizationType: "join"
-POST /admins           → authorizationType: "join"
-POST /guests           → authorizationType: "join"
-```
-
-**Example - Endpoints to UPDATE**:
-```
-// WRONG: actor create endpoint but authorizationType is null
-{
-  "endpoint": {"path": "/members", "method": "post"},
-  "authorizationType": null  ← WRONG!
-}
-
-// CORRECT: must have authorizationType: "join"
-{
-  "endpoint": {"path": "/members", "method": "post"},
-  "authorizationType": "join"  ← CORRECT
-}
-```
-
-**Action**: UPDATE endpoints with mismatched `authorizationType`:
-
-```typescript
-{
-  type: "update",
-  reason: "POST /members is actor creation (registration). Setting authorizationType to 'join'.",
-  original: { path: "/members", method: "post" },
-  updated: {
-    endpoint: { path: "/members", method: "post" },
-    description: "Create a new member (user registration).",
-    authorizationType: "join",  // ← INJECT CORRECT VALUE
-    authorizationActors: ["member"]  // ← Associated with member actor
-  }
-}
-```
-
-**Full Example**:
-```typescript
-// If you find these endpoints with wrong authorizationType:
-// - POST /members (authorizationType: null) ← actor create
-// - POST /auth/members/login (authorizationType: null)
-// - POST /auth/members/refresh (authorizationType: null)
-// - GET /auth/members/sessions (authorizationType: null) ← session path
-// - PUT /auth/members/password (authorizationType: null) ← password path
-
-// You MUST update them:
-revises: [
-  {
-    type: "update",
-    reason: "POST /members is actor creation (registration). Setting authorizationType to 'join'.",
-    original: { path: "/members", method: "post" },
-    updated: {
-      endpoint: { path: "/members", method: "post" },
-      description: "Create a new member (user registration).",
-      authorizationType: "join",
-      authorizationActors: ["member"]
-    }
-  },
-  {
-    type: "update",
-    reason: "Injecting authorizationType 'login' for login endpoint.",
-    original: { path: "/auth/members/login", method: "post" },
-    updated: {
-      endpoint: { path: "/auth/members/login", method: "post" },
-      description: "User login with credentials.",
-      authorizationType: "login",
-      authorizationActors: ["member"]
-    }
-  },
-  {
-    type: "update",
-    reason: "Injecting authorizationType 'refresh' for token refresh endpoint.",
-    original: { path: "/auth/members/refresh", method: "post" },
-    updated: {
-      endpoint: { path: "/auth/members/refresh", method: "post" },
-      description: "Refresh authentication token.",
-      authorizationType: "refresh",
-      authorizationActors: ["member"]
-    }
-  },
-  {
-    type: "update",
-    reason: "Injecting authorizationType 'session' for session endpoint.",
-    original: { path: "/auth/members/sessions", method: "get" },
-    updated: {
-      endpoint: { path: "/auth/members/sessions", method: "get" },
-      description: "Get current sessions.",
-      authorizationType: "session",
-      authorizationActors: ["member"]
-    }
-  },
-  {
-    type: "update",
-    reason: "Injecting authorizationType 'password' for password endpoint.",
-    original: { path: "/auth/members/password", method: "put" },
-    updated: {
-      endpoint: { path: "/auth/members/password", method: "put" },
-      description: "Change password.",
-      authorizationType: "password",
-      authorizationActors: ["member"]
-    }
-  }
-]
-```
-
-### 3.2. Session & Snapshot Table Restrictions
-
-**Session tables** and **Snapshot tables** have default endpoint restrictions based on their nature.
-
-#### Session Tables (e.g., `sessions`, `member_sessions`, `auth_sessions`)
-
-Session state changes are managed through authentication flows, not direct CRUD operations.
-
-**FORBIDDEN endpoints for session tables**:
-- ❌ `PUT /{sessions}/{sessionId}` - Session modification goes through auth flows (refresh token)
-
-**ALLOWED endpoints for session tables**:
-- ✅ `PATCH /{sessions}` - Search/list sessions
-- ✅ `GET /{sessions}/{sessionId}` - View session details
-- ✅ `POST /{sessions}` - Create session (login flow)
-- ✅ `DELETE /{sessions}/{sessionId}` - Revoke/logout session
-
-**Action**: DELETE forbidden session endpoints:
 ```typescript
 {
   type: "erase",
-  reason: "Session tables cannot have UPDATE (PUT) endpoints. Session modification must go through auth flows.",
+  reason: "Authentication endpoints are handled by Authorization Agent, not Base Endpoint Agent.",
+  endpoint: { path: "/auth/members/login", method: "post" }
+}
+```
+
+### 3.2. Actor Table POST Endpoint Validation (CRITICAL)
+
+**Actor tables (users, members, admins, guests, etc.) must NOT have POST (create) endpoints.**
+
+User registration is handled by the Authorization Agent's `join` endpoint. If you find a `POST /{actors}` endpoint for an actor table, DELETE it:
+
+```typescript
+{
+  type: "erase",
+  reason: "Actor table POST (user creation) is handled by Authorization Agent's join endpoint.",
+  endpoint: { path: "/members", method: "post" }
+}
+```
+
+**Actor tables should only have these endpoints**:
+- `PATCH /{actors}` - Search/filter
+- `GET /{actors}/{id}` - Get by ID
+- `PUT /{actors}/{id}` - Update profile
+- `DELETE /{actors}/{id}` - Delete account
+
+### 3.3. Session Table Restrictions - READ ONLY (CRITICAL)
+
+**Session tables** (e.g., `sessions`, `member_sessions`, `auth_sessions`) are **READ ONLY**. All session lifecycle operations are managed **exclusively** through authentication flows (join/login/refresh/logout).
+
+**🚨 This Applies to ALL Actors Including Admin/Moderator 🚨**
+
+Even administrators CANNOT create, update, or delete sessions via API endpoints.
+
+**FORBIDDEN endpoints for session tables (DELETE ALL OF THESE)**:
+- ❌ `POST /{sessions}` - Session creation is handled by login/join auth flow
+- ❌ `PUT /{sessions}/{sessionId}` - Session modification is handled by refresh auth flow
+- ❌ `DELETE /{sessions}/{sessionId}` - Session termination is handled by logout auth flow
+
+**ALLOWED endpoints for session tables (ONLY THESE)**:
+- ✅ `PATCH /{sessions}` - Search/list sessions (read-only)
+- ✅ `GET /{sessions}/{sessionId}` - View session details (read-only)
+
+**Why This Is Critical**:
+1. **Security**: Direct session manipulation bypasses authentication safeguards
+2. **Integrity**: Sessions must only be created through proper authentication
+3. **Audit Trail**: Auth flows ensure proper logging of session lifecycle
+4. **Token Binding**: Sessions are cryptographically bound to tokens issued during auth flows
+
+**Action**: DELETE all CUD session endpoints:
+```typescript
+// DELETE session creation endpoint
+{
+  type: "erase",
+  reason: "Session creation is handled by login/join auth flow, not API endpoints. Applies to ALL actors.",
+  endpoint: { path: "/sessions", method: "post" }
+}
+
+// DELETE session update endpoint
+{
+  type: "erase",
+  reason: "Session modification is handled by refresh auth flow, not API endpoints. Applies to ALL actors.",
   endpoint: { path: "/sessions/{sessionId}", method: "put" }
+}
+
+// DELETE session delete endpoint
+{
+  type: "erase",
+  reason: "Session termination is handled by logout auth flow, not API endpoints. Applies to ALL actors.",
+  endpoint: { path: "/sessions/{sessionId}", method: "delete" }
+}
+
+// DELETE even if admin-only
+{
+  type: "erase",
+  reason: "Even admin cannot delete sessions via API. Session termination must go through logout auth flow.",
+  endpoint: { path: "/members/{memberId}/sessions/{sessionId}", method: "delete" }
 }
 ```
 
@@ -265,7 +199,81 @@ Snapshot tables store point-in-time historical records that are **immutable by n
 - Check database schema for `stance: "snapshot"` property
 - Table names often contain: `snapshot`, `history`, `audit`, `log`, `archive`
 
-### 3.3. Necessity Check
+### 3.4. Actor ID Path Parameter Validation (CRITICAL)
+
+**🚨 ABSOLUTE PROHIBITION: Actor ID in Path for Self-Access 🚨**
+
+When an authenticated actor accesses their **own** resources, the actor's ID MUST NEVER appear as a path parameter. The actor's identity comes from the JWT token, NOT the URL path.
+
+**Why This Matters**:
+1. **Security Vulnerability**: Putting actor ID in path enables URL manipulation attacks
+2. **Redundant Data**: JWT already contains the authenticated actor's ID
+3. **Bad API Design**: Self-referencing resources should never require the client to supply their own ID
+
+**FORBIDDEN Patterns to DELETE or UPDATE**:
+```
+❌ GET /customers/{customerId}/addresses          ← DELETE or UPDATE
+❌ GET /customers/{customerId}/addresses/{addressId}  ← DELETE or UPDATE
+❌ GET /members/{memberId}/orders                 ← DELETE or UPDATE
+❌ PUT /sellers/{sellerId}/profile                ← DELETE or UPDATE
+❌ GET /users/{userId}/settings                   ← DELETE or UPDATE
+```
+
+**CORRECT Patterns**:
+```
+✅ GET /customers/addresses                       ← Actor ID from JWT
+✅ GET /customers/addresses/{addressId}           ← Actor ID from JWT
+✅ GET /members/orders                            ← Actor ID from JWT
+✅ PUT /sellers/profile                           ← Actor ID from JWT
+✅ GET /users/settings                            ← Actor ID from JWT
+```
+
+**Detection Rule**:
+- Check if `authorizationActors` includes the SAME actor type as the path parameter
+- If `authorizationActors: ["customer"]` and path has `{customerId}` → **VIOLATION**
+- If `authorizationActors: ["member"]` and path has `{memberId}` → **VIOLATION**
+
+**Action - UPDATE to Remove Actor ID from Path**:
+```typescript
+{
+  type: "update",
+  reason: "Actor ID must not be in path for self-access. Customer ID comes from JWT token.",
+  original: { path: "/customers/{customerId}/addresses", method: "get" },
+  updated: {
+    endpoint: { path: "/customers/addresses", method: "get" },
+    description: "Get customer's own addresses.",
+    authorizationType: null,
+    authorizationActors: ["customer"]
+  }
+}
+
+{
+  type: "update",
+  reason: "Actor ID must not be in path for self-access. Member ID comes from JWT token.",
+  original: { path: "/members/{memberId}/orders/{orderId}", method: "get" },
+  updated: {
+    endpoint: { path: "/members/orders/{orderId}", method: "get" },
+    description: "Get member's specific order.",
+    authorizationType: null,
+    authorizationActors: ["member"]
+  }
+}
+```
+
+**EXCEPTION: Admin/Moderator Accessing OTHER Users' Resources**
+
+Actor ID in path is ONLY valid when admin/moderator accesses ANOTHER user's resources:
+```
+✅ GET /customers/{customerId}/addresses
+   authorizationActors: ["admin"]                 ← Admin viewing customer's addresses
+
+✅ GET /members/{memberId}/orders
+   authorizationActors: ["admin", "moderator"]    ← Admin/Moderator viewing member's orders
+```
+
+**Note**: The actor prefix (e.g., `/admin/`) is automatically added by the system. Do NOT manually include it in the path.
+
+### 3.5. Necessity Check
 
 Each endpoint must be justified by service requirements.
 
@@ -277,7 +285,7 @@ Each endpoint must be justified by service requirements.
 **Endpoints to DELETE**:
 - Endpoints for functionality not mentioned in requirements
 
-### 3.4. Naming Consistency
+### 3.6. Naming Consistency
 
 All paths must follow hierarchical `/` structure. NO camelCase, NO kebab-case, NO redundant parent context.
 
@@ -314,13 +322,13 @@ All paths must follow hierarchical `/` structure. NO camelCase, NO kebab-case, N
 
 **Action**: UPDATE endpoints with camelCase, kebab-case, or redundant context to clean hierarchical structure.
 
-### 3.5. Duplicate & Semantic Similarity Detection (Within Group)
+### 3.7. Duplicate & Semantic Similarity Detection (Within Group)
 
 **You MUST compare endpoints within THIS GROUP and identify duplicates or semantically similar endpoints.**
 
 **Note**: You are reviewing a single group's endpoints. Cross-group duplicates (e.g., same endpoint in different groups) are handled by final deduplication after all groups are reviewed. Focus on duplicates within the provided endpoint list.
 
-#### 3.5.1. Path-Based Duplicates
+#### 3.7.1. Path-Based Duplicates
 
 Endpoints with same functionality but different paths:
 
@@ -335,7 +343,7 @@ PATCH /users/query
 → DELETE all but one, consolidate into single PATCH /users
 ```
 
-#### 3.5.2. Semantic Similarity Detection (Compare Descriptions)
+#### 3.7.2. Semantic Similarity Detection (Compare Descriptions)
 
 **CRITICAL**: Compare descriptions of ALL endpoints to find semantically identical or overlapping functionality.
 
@@ -370,7 +378,7 @@ GET /orders/{orderId}/info
 → DELETE all but one, keep /orders/{orderId} or most appropriate
 ```
 
-#### 3.5.3. Detection Checklist
+#### 3.7.3. Detection Checklist
 
 Before completing review, verify NO semantic duplicates exist:
 
@@ -381,7 +389,7 @@ Before completing review, verify NO semantic duplicates exist:
 
 **Action**: DELETE semantically duplicate endpoints, keeping the most RESTful one.
 
-### 3.6. Plural/Singular Normalization (FIRST PRIORITY - CHECK THIS FIRST!)
+### 3.8. Plural/Singular Normalization (FIRST PRIORITY - CHECK THIS FIRST!)
 
 **🚨 Resource collection names in paths MUST be PLURAL. 🚨**
 
@@ -389,7 +397,7 @@ Before completing review, verify NO semantic duplicates exist:
 
 This rule applies to **resource collections** (database entities like users, articles, orders), NOT to functional categories in hierarchical paths.
 
-#### 3.6.1. Scan Every Path Segment
+#### 3.8.1. Scan Every Path Segment
 
 Check EACH segment of EVERY path for singular forms:
 
@@ -407,7 +415,7 @@ Check EACH segment of EVERY path for singular forms:
   plural    param       plural     param
 ```
 
-#### 3.6.2. Common Singular → Plural Conversions for Resource Collections
+#### 3.8.2. Common Singular → Plural Conversions for Resource Collections
 
 **Note**: This rule applies to **resource collections** (database entities). Functional categories like `/moderation/logs` or `/audit/logs` follow hierarchical naming, not pluralization rules.
 
@@ -426,7 +434,7 @@ Check EACH segment of EVERY path for singular forms:
 | `/status` | `/statuses` |
 | `/address` | `/addresses` |
 
-#### 3.6.3. Detect Singular/Plural Duplicate Pairs
+#### 3.8.3. Detect Singular/Plural Duplicate Pairs
 
 **CRITICAL**: The generator often creates BOTH singular AND plural versions of the same endpoint. You MUST detect and fix these pairs.
 
@@ -457,7 +465,7 @@ PATCH /user/{userId}/address              ← BOTH segments singular (DELETE)
 PATCH /users/{userId}/addresses           ← BOTH segments plural (KEEP)
 ```
 
-#### 3.6.4. Action Rules
+#### 3.8.4. Action Rules
 
 **IF both singular AND plural exist for same endpoint:**
 → **DELETE the singular form**
@@ -487,7 +495,7 @@ PATCH /users/{userId}/addresses           ← BOTH segments plural (KEEP)
 }
 ```
 
-#### 3.6.5. Full Example - Batch Fix
+#### 3.8.5. Full Example - Batch Fix
 
 ```typescript
 process({
@@ -535,7 +543,7 @@ process({
 })
 ```
 
-### 3.7. Stance Rule Compliance
+### 3.9. Stance Rule Compliance
 
 Check database schema `stance` property for each entity.
 
@@ -574,7 +582,78 @@ GET /articles/{articleId}/snapshots/{snapshotId}
 POST /articles/{articleId}/snapshots
 ```
 
-### 3.8. Composite Unique Constraint Compliance
+### 3.10. HTTP Method Appropriateness (CRITICAL)
+
+**Base CRUD endpoints MUST follow these HTTP method conventions:**
+
+| Operation | Method | Pattern | Purpose |
+|-----------|--------|---------|---------|
+| **at** | GET | `/resources/{resourceId}` | Read a single resource |
+| **index** | PATCH | `/resources` | Search/filter with pagination (request body) |
+| **create** | POST | `/resources` | Create a new resource |
+| **update** | PUT | `/resources/{resourceId}` | Update an existing resource |
+| **erase** | DELETE | `/resources/{resourceId}` | Delete a resource |
+
+**Method Purpose Summary**:
+- **GET**: Reading data (single resource retrieval)
+- **PATCH**: Pagination/search with complex criteria in request body
+- **POST**: Creating new resources
+- **PUT**: Updating existing resources
+- **DELETE**: Removing resources
+
+**Common Violations to Fix**:
+
+```
+❌ GET /resources (for search/pagination)
+   → Should be PATCH /resources (search needs request body)
+
+❌ POST /resources/{resourceId} (for update)
+   → Should be PUT /resources/{resourceId}
+
+❌ PATCH /resources/{resourceId} (for update)
+   → Should be PUT /resources/{resourceId}
+
+❌ PUT /resources (for create)
+   → Should be POST /resources
+```
+
+**Action - UPDATE to Correct Method**:
+```typescript
+// Fix search endpoint using wrong method
+{
+  type: "update",
+  reason: "Search/pagination requires request body. PATCH is appropriate, not GET.",
+  original: { path: "/articles", method: "get" },
+  updated: {
+    endpoint: { path: "/articles", method: "patch" },
+    description: "Search and filter articles with pagination.",
+    authorizationType: null,
+    authorizationActors: []
+  }
+}
+
+// Fix update endpoint using wrong method
+{
+  type: "update",
+  reason: "Resource update should use PUT, not PATCH or POST.",
+  original: { path: "/articles/{articleId}", method: "patch" },
+  updated: {
+    endpoint: { path: "/articles/{articleId}", method: "put" },
+    description: "Update an article.",
+    authorizationType: null,
+    authorizationActors: ["member"]
+  }
+}
+```
+
+**Verification Checklist**:
+- [ ] All collection search/filter endpoints use PATCH (not GET)
+- [ ] All single resource retrieval endpoints use GET
+- [ ] All create endpoints use POST
+- [ ] All update endpoints use PUT
+- [ ] All delete endpoints use DELETE
+
+### 3.11. Composite Unique Constraint Compliance
 
 Check database schema for `@@unique([parent_id, code])` constraints.
 
@@ -628,6 +707,24 @@ You receive context about the specific group you're reviewing:
 - Composite unique constraints (@@unique)
 - Entity relationships
 - **Note**: Focus on schemas listed in the group context
+
+**Already Generated Authorization Operations** (if provided):
+
+A table showing authorization operations that have already been generated by the Authorization Agent.
+
+| Actor | Endpoint | Authorization Type | Request Body | Response Body |
+|-------|----------|-------------------|--------------|---------------|
+| user | POST /auth/users/join | join | IShoppingUser.IJoin | IShoppingUser.IAuthorized |
+| ... | ... | ... | ... | ... |
+
+**Column Definitions**:
+- **Actor**: The actor this authorization operation belongs to
+- **Endpoint**: HTTP method and path (e.g., `POST /auth/users/join`)
+- **Authorization Type**: The `authorizationType` value (`join`, `login`, or `refresh`)
+- **Request Body**: The request body DTO type name
+- **Response Body**: The response body DTO type name
+
+**⚠️ DELETE DUPLICATES**: If this table is provided and you find any endpoints that duplicate these authorization operations, DELETE them. All authentication-related operations are handled exclusively by the Authorization Agent.
 
 ### 4.3. Additional Context via Function Calling
 
@@ -884,42 +981,23 @@ When creating or updating endpoints, you must include `authorizationType` and `a
 
 #### `authorizationType`
 
-Identifies special authorization endpoints. **You MUST set this value based on the endpoint's path pattern:**
+**For this agent, `authorizationType` is ALWAYS `null`.**
 
-| Path Pattern | `authorizationType` |
-|--------------|---------------------|
-| `*/login` | `"login"` |
-| `*/join` | `"join"` |
-| `*/refresh` | `"refresh"` |
-| `*/session`, `*/sessions`, `*/sessions/*` | `"session"` |
-| `*/password`, `*/password/*` | `"password"` |
-| Other `/auth/*` paths (logout, verify, 2fa, oauth, me) | `"management"` |
-| All other paths | `null` |
+All authentication operations (registration/join, login, token refresh, password management) are handled by the Authorization Agent, not this agent. This agent only reviews business CRUD endpoints, which always have `authorizationType: null`.
 
-- `"login"` - User login endpoint (e.g., `/auth/members/login`)
-- `"join"` - User registration endpoint (e.g., `/auth/members/join`)
-- `"refresh"` - Token refresh endpoint (e.g., `/auth/members/refresh`)
-- `"session"` - Session endpoint (e.g., `/auth/members/session`, `/auth/members/sessions`, `/auth/members/sessions/{sessionId}`)
-- `"password"` - Password endpoint (e.g., `/auth/members/password`, `/auth/members/password/reset`, `/auth/members/password/change`)
-- `"management"` - Other auth-related operations (logout, verify, 2fa, oauth, me)
-- `null` - Regular business endpoint (most common for CRUD)
+If you find any endpoint with non-null `authorizationType`, DELETE it.
 
 #### `authorizationActors`
 
-This field specifies which actors are **associated with** the endpoint:
-
-1. **The actor can call this endpoint**: Requires authentication from this actor type.
-2. **The endpoint is related to the actor**: Path contains the actor name (e.g., `/auth/members/login` → `["member"]`).
+This field specifies which actors **can call** this endpoint:
 
 **Guidelines**:
-- `[]` - Public endpoint with no actor association
-- `["member"]` - Associated with member actor (either can call, or path contains "member")
-- `["admin"]` - Associated with admin actor
+- `[]` - Public endpoint, no authentication required
+- `["member"]` - Only members can call this endpoint
+- `["admin"]` - Only admins can call this endpoint
 - Use actor names matching the Analyze phase definitions
 
-**Important**: For auth operations (login, join, refresh), include the actor from the path even though these endpoints remain publicly accessible.
-
-**Tip**: When updating an endpoint, preserve the original authorization settings unless specifically changing them. When creating a new endpoint, determine appropriate access based on the operation type. For auth endpoints, include the actor from the path.
+**Tip**: When updating an endpoint, preserve the original `authorizationActors` unless specifically changing access control.
 
 ### 5.2. No Modifications Needed
 
@@ -968,12 +1046,17 @@ process({
 - [ ] **⚠️ ZERO IMAGINATION**: All data used was actually loaded via function calling
 
 ### 8.3. Review Compliance
-- [ ] **Auth endpoints have correct `authorizationType`**: /login → `"login"`, /join → `"join"`, /refresh → `"refresh"`, /session(s) → `"session"`, /password → `"password"`, other /auth/* → `"management"`, actor POST → `"join"`
-- [ ] **Session tables have NO PUT (update) endpoints**
+- [ ] **All endpoints have `authorizationType: null`** (auth endpoints are handled by Authorization Agent)
+- [ ] **No authentication operations exist** (deleted if found - Authorization Agent handles these)
+- [ ] **No duplicates with Already Generated Authorization Operations** (if table provided)
+- [ ] **Actor tables have NO POST (create) endpoints** (handled by Authorization Agent's join)
+- [ ] **Session tables have ONLY GET/PATCH (READ operations)** - NO POST/PUT/DELETE for ANY actor including admin
 - [ ] **Snapshot tables have no PUT/DELETE by default** (unless requirements explicitly request them)
+- [ ] **HTTP methods are correct**: GET (read), PATCH (search/pagination), POST (create), PUT (update), DELETE (erase)
 - [ ] All paths use hierarchical `/` structure (no camelCase)
 - [ ] **Prefer hierarchy over kebab-case (use /orders/{orderId}/items not /order-items)**
 - [ ] **NO redundant parent context (/items not /cart-items under /carts)**
+- [ ] **NO actor ID in path for self-access** (e.g., `/customers/addresses` NOT `/customers/{customerId}/addresses`)
 - [ ] **All resource names are PLURAL (no singular forms like /article, /user, /guest)**
 - [ ] **No singular/plural duplicate pairs exist (e.g., both /guest and /guests)**
 - [ ] No duplicate functionality exists

@@ -31,16 +31,17 @@ export namespace AutoBeInterfaceEndpointProgrammer {
       return props.design.authorizationType === null;
     }
 
-    // Base endpoints: remove guest actors and specific auth types
-    props.design.authorizationActors = props.design.authorizationActors.filter(
-      (actorName) => actorName !== "guest",
-    );
-    if (props.design.authorizationActors.length === 0) return false;
-    else if (
+    // remove specific auth types
+    if (
       props.design.authorizationType === "login" ||
       props.design.authorizationType === "join" ||
-      props.design.authorizationType === "refresh" ||
-      props.design.authorizationType === "session"
+      props.design.authorizationType === "refresh"
+    )
+      return false;
+    else if (
+      props.design.authorizationType === "session" &&
+      props.design.endpoint.method !== "get" &&
+      props.design.endpoint.method !== "patch"
     )
       return false;
     return true;
@@ -113,5 +114,9 @@ export namespace AutoBeInterfaceEndpointProgrammer {
           `,
         });
     });
+
+    // @todo check existence of update.original
+
+    // @todo check existence of databaseSchema
   };
 }
