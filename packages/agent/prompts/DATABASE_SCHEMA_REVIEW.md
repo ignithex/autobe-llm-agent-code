@@ -179,6 +179,19 @@ Your review must comprehensively evaluate the following aspects:
 - **1NF Completeness**: If the target table model has columns that violate atomicity, declare the corresponding child tables as newDesigns so they are generated separately.
 - **2NF Validation**: Verify full functional dependency on primary key
 - **3NF Validation**: Confirm no transitive dependencies exist
+- **3NF Parent-Child Field Duplication (CRITICAL)**: When reviewing a child table, verify NO field duplicates its parent table fields. If parent table context is provided, cross-reference each child field against parent fields. Child tables should contain ONLY:
+  1. Own primary key (`id`)
+  2. Foreign key to parent (`{singular(parent_name)}_id`)
+  3. Child-specific attributes that have NO equivalent in parent
+
+  Common violations to detect and remove:
+  | Parent Field | Duplicate in Child (VIOLATION) | Correct Action |
+  |-------------|-------------------------------|----------------|
+  | `status` | `parent_status`, `order_status` | Remove from child, JOIN parent |
+  | `created_at` | `parent_created_at` | Remove from child, JOIN parent |
+  | `customer_id` | `order_customer_id` | Remove from child, FK via parent |
+  | `total_amount` | `order_total` | Remove from child, compute or JOIN |
+
 - **Denormalization Justification**: Accept intentional denormalization only with clear performance benefits in mv_ tables
 
 ### Dimension 2: Relationship Integrity
@@ -424,6 +437,20 @@ Draft Model: shopping_carts
 Issue: None
 Review: "Target table shopping_carts passes all 14 review dimensions. 1NF is properly enforced. Naming conventions, indexes, and relationships are all correct."
 Modification: null (no changes needed)
+```
+
+### Scenario 9: Parent-Child Field Duplication (3NF Violation)
+
+```
+Target Model: shopping_order_items
+Parent Model Context Provided: shopping_orders (with fields: id, shopping_customer_id, status, total_amount, created_at, updated_at, deleted_at)
+
+Issue: shopping_order_items contains `order_status` and `order_customer_id` fields that duplicate parent fields
+Review: "The child table shopping_order_items duplicates parent table fields:
+- `order_status` duplicates `shopping_orders.status` — this is a transitive dependency (3NF violation)
+- `order_customer_id` duplicates `shopping_orders.shopping_customer_id` — redundant, should access via FK join
+Child tables should only contain: own PK, FK to parent, and child-specific attributes. Remove duplicated fields."
+Modification: Return corrected shopping_order_items with `order_status` and `order_customer_id` removed, keeping only `id`, `shopping_order_id` (FK), and child-specific fields like `product_id`, `quantity`, `unit_price`
 ```
 
 ## 8. Output Format
@@ -855,6 +882,12 @@ Before calling `process({ request: { type: "complete", review: "...", plan: "...
 - [ ] **newDesigns DECLARED**: Repeating/non-atomic data that requires child tables is declared as newDesigns (name + description only)
 - [ ] **newDesign NAMING**: All newDesigns use singular form of target table name as prefix (e.g., `shopping_order_items` for target `shopping_orders`)
 - [ ] **NO COLLISION**: newDesign names do not conflict with tables assigned to other components
+
+### 3NF Parent-Child Field Separation
+- [ ] **PARENT FIELD CHECK**: If parent table context is provided, verified NO field in child duplicates parent fields
+- [ ] **FK ONLY PRINCIPLE**: Child table accesses parent data via FK join, not by duplicating fields
+- [ ] **TRANSITIVE DEPENDENCY**: No field in child that transitively depends on parent's non-key fields (e.g., no `order_status` in child when parent has `status`)
+- [ ] **REDUNDANT FK CHECK**: Child does not duplicate parent's foreign keys (e.g., no `customer_id` in child when parent already has `shopping_customer_id`)
 
 ### Schema Quality
 - [ ] Naming conventions are correctly applied to the model
