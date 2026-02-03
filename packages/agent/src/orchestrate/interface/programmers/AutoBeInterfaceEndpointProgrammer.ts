@@ -9,6 +9,7 @@ import {
   IValidation,
   LlmTypeChecker,
 } from "@samchon/openapi";
+import { singular } from "pluralize";
 import typia from "typia";
 import { NamingConvention } from "typia/lib/utils/NamingConvention";
 
@@ -35,22 +36,59 @@ export namespace AutoBeInterfaceEndpointProgrammer {
     if (
       props.design.authorizationType === "login" ||
       props.design.authorizationType === "join" ||
-      props.design.authorizationType === "refresh"
+      props.design.authorizationType === "refresh" ||
+      props.design.authorizationType === "withdraw"
     )
       return false;
-    else if (
-      props.design.authorizationType === "session" &&
-      props.design.endpoint.method !== "get" &&
-      props.design.endpoint.method !== "patch"
-    )
-      return false;
+    else if (props.design.authorizationType === "session") {
+      props.design.authorizationActors =
+        props.design.authorizationActors.filter((name) => {
+          const actor: AutoBeAnalyzeActor | undefined = props.actors.find(
+            (a) => a.name === name,
+          );
+          if (actor === undefined) return false;
+          return actor.kind !== "guest";
+        });
+      if (props.design.authorizationActors.length === 0) return false;
+      else if (
+        props.design.endpoint.method !== "get" &&
+        props.design.endpoint.method !== "patch"
+      )
+        return false;
+      return true;
+    }
     return true;
   };
 
   export const fixDesign = (props: {
+    actors: AutoBeAnalyzeActor[];
     design: AutoBeInterfaceEndpointDesign;
-  }): void => {
+  }): AutoBeInterfaceEndpointDesign => {
     props.design.endpoint.path = fixPath(props.design.endpoint.path);
+    if (props.design.authorizationActors.length === 1) {
+      const actor: AutoBeAnalyzeActor | undefined = props.actors.find(
+        (a) => a.name === props.design.authorizationActors[0],
+      );
+      if (actor !== undefined && actor.kind !== "admin") {
+        const param: string =
+          NamingConvention.camel(singular(actor.name)) + "Id";
+        const bracket: string = `{${param}}`;
+        if (props.design.endpoint.path.includes(bracket) === true)
+          props.design.endpoint.path = props.design.endpoint.path.replace(
+            bracket,
+            "",
+          );
+      }
+    } else if (
+      props.design.authorizationActors.length > 1 &&
+      props.design.endpoint.path.includes("{actorId}")
+    ) {
+      props.design.endpoint.path = props.design.endpoint.path.replace(
+        "{actorId}",
+        "",
+      );
+    }
+    return props.design;
   };
 
   export const fixPath = (path: string): string => {
@@ -99,6 +137,8 @@ export namespace AutoBeInterfaceEndpointProgrammer {
     path: string;
     errors: IValidation.IError[];
   }): void => {
+    // if (props.actors.length === 0) props.design.authorizationActors = [];
+
     props.design.authorizationActors.forEach((actorName, i) => {
       if (props.actors.find((actor) => actor.name === actorName) === undefined)
         props.errors.push({
@@ -114,9 +154,5 @@ export namespace AutoBeInterfaceEndpointProgrammer {
           `,
         });
     });
-
-    // @todo check existence of update.original
-
-    // @todo check existence of databaseSchema
   };
 }
