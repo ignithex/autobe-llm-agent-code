@@ -280,12 +280,14 @@ export namespace ArchiveLogger {
     else if (event.type === "interfaceSchemaRefine")
       content.push(
         `  - typeName: ${event.typeName}`,
-        `  - databaseSchema: ${event.databaseSchema}`,
+        `  - databaseSchema: ${event.databaseSchema} (${
+          (event.schema as any)["x-autobe-database-schema"] ?? "-"
+        })`,
         `  - specification: ${JSON.stringify(event.specification)}`,
         `  - refines:`,
         ...event.refines.map(
           (r) =>
-            `    - ${r.key}: ${r.type === "erase" ? "erased" : `${r.databaseSchemaProperty} -> ${JSON.stringify(r.specification)}`}`,
+            `    - ${r.key} (${r.type}): ${r.type === "erase" ? "erased" : `${r.databaseSchemaProperty} -> ${JSON.stringify(r.specification)}`}`,
         ),
       );
     else if (event.type === "interfaceSchemaReview")
