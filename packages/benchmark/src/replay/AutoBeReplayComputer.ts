@@ -40,19 +40,23 @@ export namespace AutoBeReplayComputer {
       const add = (
         phase: IAutoBePlaygroundReplay.IPhaseState | null,
         success: number,
-        failure?: number,
+        failure: (commodity: Record<string, number>) => number,
       ): number =>
         phase !== null
           ? phase.success === true
             ? success
-            : (failure ?? success / 2)
+            : success * failure(phase.commodity)
           : 0;
-      return (
-        add(summary.analyze, 10) +
-        add(summary.database, 20) +
-        add(summary.interface, 30) +
-        add(summary.test, 20) +
-        add(summary.realize, 20)
+      return round(
+        add(summary.analyze, 10, () => 0) +
+          add(summary.database, 20, () => 0.5) +
+          add(summary.interface, 30, () => 0.5) +
+          add(summary.test, 20, (c) =>
+            Math.max(0.5, 1 - (c.errors * 3) / c.functions),
+          ) +
+          add(summary.realize, 20, (c) =>
+            Math.max(0.5, 1 - (c.errors * 3) / c.functions),
+          ),
       );
     };
     const individual = (project: AutoBeExampleProject): number => {
@@ -61,7 +65,7 @@ export namespace AutoBeReplayComputer {
       return compute(found);
     };
     return {
-      aggregate: summaries.map(compute).reduce((a, b) => a + b, 0) / 4,
+      aggregate: round(summaries.map(compute).reduce((a, b) => a + b, 0) / 4),
       todo: individual("todo"),
       bbs: individual("bbs"),
       reddit: individual("reddit"),
@@ -160,30 +164,18 @@ export namespace AutoBeReplayComputer {
     return {
       vendor: replay.vendor,
       project: replay.project,
-      aggregates: AutoBeProcessAggregateFactory.reduce(
-        replay.histories
-          .filter(
-            (h) =>
-              h.type === "analyze" ||
-              h.type === "database" ||
-              h.type === "interface" ||
-              h.type === "test" ||
-              h.type === "realize",
-          )
-          .map((h) => h.aggregates),
-      ),
-      elapsed: replay.histories
-        .filter(
-          (h) => h.type !== "userMessage" && h.type !== "assistantMessage",
-        )
-        .map(
-          (h) =>
-            new Date(h.completed_at).getTime() -
-            new Date(h.created_at).getTime(),
-        )
-        .reduce((a, b) => a + b, 0),
       ...phaseStates,
+      aggregates: AutoBeProcessAggregateFactory.reduce(
+        Object.values(phaseStates)
+          .filter((p) => p !== null)
+          .map((p) => p.aggregates),
+      ),
       phase,
+      elapsed: Object.values(phaseStates)
+        .map((p) => p?.elapsed ?? 0)
+        .reduce((a, b) => a + (b ?? 0), 0),
     };
   };
 }
+
+const round = (value: number) => Math.round(value * 100) / 100;
