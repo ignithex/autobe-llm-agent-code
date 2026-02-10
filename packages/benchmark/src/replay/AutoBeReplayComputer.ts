@@ -6,6 +6,7 @@ import {
   IAutoBePlaygroundReplay,
 } from "@autobe/interface";
 import { AutoBeProcessAggregateFactory } from "@autobe/utils";
+import typia from "typia";
 
 export namespace AutoBeReplayComputer {
   export const SIGNIFICANT_PROJECTS: AutoBeExampleProject[] = [
@@ -15,6 +16,7 @@ export namespace AutoBeReplayComputer {
     "shopping",
   ];
 
+  const sum = (targets: number[]): number => targets.reduce((a, b) => a + b, 0);
   export const emoji = (
     summaries: IAutoBePlaygroundReplay.ISummary[],
   ): string => {
@@ -37,28 +39,33 @@ export namespace AutoBeReplayComputer {
 
     // the formula to compute the benchmark score
     const compute = (summary: IAutoBePlaygroundReplay.ISummary): number => {
-      const add = (
-        phase: IAutoBePlaygroundReplay.IPhaseState | null,
-        success: number,
-        failure: (commodity: Record<string, number>) => number,
-      ): number =>
-        phase !== null
-          ? phase.success === true
-            ? success
-            : success * failure(phase.commodity)
-          : 0;
-      return round(
-        add(summary.analyze, 10, () => 0) +
-          add(summary.database, 20, () => 0.5) +
-          add(summary.interface, 30, () => 0.5) +
-          add(summary.test, 20, (c) =>
-            Math.max(0.5, 1 - (c.errors * 3) / c.functions),
-          ) +
-          add(summary.realize, 20, (c) =>
-            Math.max(0.5, 1 - (c.errors * 3) / c.functions),
-          ),
-      );
+      // for type check
+      const calculateFormula = {
+        analyze: [10, () => 0],
+        database: [20, () => 0.5],
+        interface: [30, () => 0.5],
+        test: [20, (c) => Math.max(0.5, 1 - (c.errors * 3) / c.functions)],
+        realize: [20, (c) => Math.max(0.5, 1 - (c.errors * 3) / c.functions)],
+      } as const satisfies Record<
+        AutoBePhase,
+        [number, (commodity: Record<string, number>) => number]
+      >;
+
+      const getScore = (phase: AutoBePhase): number => {
+        const state = summary[phase];
+
+        if (state === null) return 0;
+
+        const [success, failure] = calculateFormula[phase];
+
+        return state.success === true
+          ? success
+          : success * failure(state.commodity);
+      };
+
+      return round(sum(typia.misc.literals<AutoBePhase>().map(getScore)));
     };
+
     const individual = (project: AutoBeExampleProject): number => {
       const found = summaries.find((s) => s.project === project);
       if (found === undefined) return 0;
