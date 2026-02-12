@@ -73,7 +73,7 @@ export const createAutoBeContext = (props: {
 }): AutoBeContext => {
   const config: Required<Omit<IAutoBeConfig, "backoffStrategy" | "timezone">> =
     {
-      retry: props.config.retry ?? AutoBeConfigConstant.RETRY,
+      retry: props.config.retry ?? AutoBeConfigConstant.VALIDATION_RETRY,
       locale: props.config.locale ?? "en-US",
       timeout: props.config.timeout ?? null,
     };
@@ -160,7 +160,7 @@ export const createAutoBeContext = (props: {
                   event.errorMessage,
                 ),
             },
-            retry: props.config?.retry ?? AutoBeConfigConstant.RETRY,
+            retry: props.config?.retry ?? AutoBeConfigConstant.VALIDATION_RETRY,
             // stream: false,
             stream: next.enforceFunctionCall === false,
           } satisfies IMicroAgenticaConfig,
@@ -343,7 +343,7 @@ export const createAutoBeContext = (props: {
       };
       return await forceRetry(
         execute,
-        AutoBeConfigConstant.FUNCTION_CALLING_RETRY,
+        AutoBeConfigConstant.API_ERROR_RETRY,
         (error) =>
           error instanceof APIError ||
           error instanceof AgenticaJsonParseError ||
