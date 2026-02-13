@@ -24,30 +24,49 @@ export const enum AutoBeConfigConstant {
    * diagnostics) back to the AI for correction. This iterative feedback loop
    * transforms hallucinations into learning opportunities.
    *
-   * Value of 4 balances correction success rate against latency: most
-   * validation errors resolve within 2-3 attempts, while permanent issues
-   * (fundamentally misunderstood requirements) fail fast rather than wasting
-   * resources.
+   * Value of 8 provides sufficient attempts for complex validation scenarios
+   * while keeping latency reasonable. Most validation errors resolve within 2-3
+   * attempts, but complex schema corrections may need additional cycles.
+   * Permanent issues (fundamentally misunderstood requirements) still fail fast
+   * rather than wasting resources.
    */
-  VALIDATION_RETRY = 5,
+  VALIDATION_RETRY = 8,
 
   /**
    * Retry attempts specifically for AutoBE compiler error correction loops.
    *
    * Used by compiler/diagnostic passes that iteratively refine generated code
    * or AST based on compiler feedback (syntax errors, type errors, or invalid
-   * transformations). Unlike the general `RETRY` constant, this is scoped to
-   * compilation and code-fix phases where each iteration tends to be more
-   * expensive and has diminishing returns after a few attempts.
+   * transformations). Unlike the general `VALIDATION_RETRY` constant, this is
+   * scoped to compilation and code-fix phases where each iteration tends to be
+   * more expensive and has diminishing returns after a few attempts.
    *
-   * Value of 3 keeps compiler correction cycles shorter than general LLM
-   * interaction retries (which default to 5). Most compiler issues are either
-   * resolved within the first couple of passes or indicate a fundamental
-   * mismatch that won't benefit from further attempts. The lower limit reduces
-   * end-to-end latency and avoids long-running compile/fix loops while still
-   * allowing meaningful automatic correction.
+   * Value of 5 provides a reasonable number of correction cycles for general
+   * compiler issues. Most compiler issues are either resolved within the first
+   * couple of passes or indicate a fundamental mismatch that won't benefit from
+   * further attempts. For database schema corrections specifically, use
+   * `DATABASE_CORRECT_RETRY` which allows more iterations due to the cascading
+   * nature of schema errors.
    */
-  COMPILER_RETRY = 5,
+  COMPILER_RETRY = 4,
+
+  /**
+   * Retry attempts specifically for Prisma schema correction loops.
+   *
+   * Used by `orchestratePrismaCorrect` when iteratively fixing database schema
+   * compilation errors. Prisma schema correction is particularly challenging
+   * because errors often cascade (one fix reveals new errors) and require
+   * multiple passes to fully resolve complex relationship and constraint
+   * issues.
+   *
+   * Value of 20 is intentionally higher than `COMPILER_RETRY` because database
+   * schema corrections tend to be incremental - each iteration typically fixes
+   * one or two issues rather than resolving everything at once. The higher
+   * limit accommodates complex schemas with many inter-model relationships
+   * while still providing a reasonable bound to prevent infinite correction
+   * loops.
+   */
+  DATABASE_CORRECT_RETRY = 20,
 
   /**
    * Retry attempts for LLM function-calling execution flows.
@@ -66,17 +85,6 @@ export const enum AutoBeConfigConstant {
    * resource usage.
    */
   API_ERROR_RETRY = 3,
-
-  /**
-   * Batch count for parallel operation processing.
-   *
-   * Controls how many batches `divideArray` creates when splitting large
-   * operation lists for concurrent processing. Value of 2 provides optimal
-   * balance: parallelizes work to reduce latency while keeping batch sizes
-   * large enough for effective prompt caching. Higher values increase
-   * parallelism but reduce cache hit rates.
-   */
-  INTERFACE_CAPACITY = 1,
 
   /**
    * Maximum iterations for RAG (Retrieval-Augmented Generation) loops.
