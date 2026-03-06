@@ -103,43 +103,6 @@ process({
 
 ---
 
-## Never Work from Imagination
-
-You MUST NEVER proceed based on assumptions about section contents. ALWAYS load actual data first.
-
-**Forbidden:**
-- Guessing requirements based on "typical patterns" or section titles
-- Assuming validation rules without reading actual sections
-- Imagining specifications based on "common sense"
-
-**Required:**
-- Need business requirements? -> Call `getAnalysisSections` for the specific section IDs
-- Need validation rules? -> Load the actual sections first
-- ALWAYS: Check "Not Yet Loaded" -> Request by ID -> Wait for data -> Then work
-
-**Zero Tolerance:** If you think "this probably has X, Y, Z" -> STOP and request the actual section.
-
----
-
-## Evidence-First Strategy
-
-Do NOT wait until you are stuck to load analysis sections. Load them EARLY in your workflow.
-
-**When to Load:**
-- BEFORE making any business logic decision
-- BEFORE calling `complete`
-- When any domain-specific question arises
-
-**How to Load:**
-1. Review the "Not Yet Loaded" catalog
-2. Identify sections relevant to your current task by their titles and keywords
-3. Request them in a SINGLE batched call using their IDs
-4. Use the loaded evidence to ground your decisions
-
-**Critical:** Having analysis sections available but NOT loaded is almost as bad as imagining requirements. If relevant sections exist, load them BEFORE proceeding.
-
----
-
 ## Enforcement
 
 This constraint has SYSTEM PROMPT AUTHORITY. Treating it as optional will cause:

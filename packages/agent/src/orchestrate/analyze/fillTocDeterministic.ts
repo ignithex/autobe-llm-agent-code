@@ -26,6 +26,18 @@ interface ITocFileState {
   sectionResults: AutoBeAnalyzeWriteSectionEvent[][] | null;
 }
 
+// ─── Helpers ───
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N} -]/gu, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 // ─── Zero-cost metric/token stubs ───
 
 const ZERO_TOKEN_USAGE = {
@@ -182,16 +194,54 @@ function buildTocContent(
 
   // ── Section Navigation ──
   lines.push("", "**Section Navigation**");
+  lines.push(
+    "",
+    '> Load sections by ID: `process({ request: { type: "getAnalysisSections", sectionIds: [ID, ...] } })`',
+  );
+
+  // TOC itself occupies section ID 0, so remaining files start from ID 1
+  let sectionId = 1;
+
   for (const state of otherFileStates) {
     if (!state.moduleResult || !state.unitResults) continue;
     const filename = state.file.filename;
     lines.push("", `**[${filename}](./${filename})**`);
-    for (const unitEvent of state.unitResults) {
-      const unitTitles = unitEvent.unitSections.map((u) => u.title).join(" / ");
-      const moduleSection =
-        state.moduleResult.moduleSections[unitEvent.moduleIndex];
-      const moduleTitle = moduleSection?.title ?? "";
-      lines.push(`- ${moduleTitle}: ${unitTitles}`);
+
+    // Per-file anchor counter for GFM duplicate heading resolution
+    const anchorCounts = new Map<string, number>();
+    const resolveAnchor = (title: string): string => {
+      const base = slugify(title);
+      const count = anchorCounts.get(base) ?? 0;
+      anchorCounts.set(base, count + 1);
+      return count === 0 ? base : `${base}-${count}`;
+    };
+
+    // Same traversal order as assembleModule / convertToSectionEntries:
+    // moduleIndex ascending, then unitIndex ascending
+    for (
+      let moduleIndex = 0;
+      moduleIndex < state.moduleResult.moduleSections.length;
+      moduleIndex++
+    ) {
+      const moduleSection = state.moduleResult.moduleSections[moduleIndex];
+      const unitEvent = state.unitResults[moduleIndex];
+      if (!moduleSection || !unitEvent) continue;
+
+      lines.push(
+        `- [${moduleSection.title}](./${filename}#${resolveAnchor(moduleSection.title)})`,
+      );
+
+      for (const unitSection of unitEvent.unitSections) {
+        const keywords =
+          unitSection.keywords.length > 0
+            ? ` {${unitSection.keywords.join(", ")}}`
+            : "";
+        const purpose = unitSection.purpose ? ` — ${unitSection.purpose}` : "";
+        lines.push(
+          `  - [${sectionId}] [${unitSection.title}](./${filename}#${resolveAnchor(unitSection.title)})${purpose}${keywords}`,
+        );
+        sectionId++;
+      }
     }
   }
 
