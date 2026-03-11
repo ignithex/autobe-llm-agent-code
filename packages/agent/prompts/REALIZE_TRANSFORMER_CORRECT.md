@@ -173,9 +173,21 @@ articleTags: {
 } satisfies Prisma.bbs_article_tagsFindManyArgs,
 ```
 
-### 5.4. Nullable Date → Required DTO Field
+### 5.4. Date → `string & Format<"date-time">`
 
-When `DateTime?` (nullable) maps to `string & Format<"date-time">` (required), choose a default that reflects the field's semantic meaning:
+**Basic case (most common TS2322)**: Prisma `DateTime` returns a `Date` object. DTO expects `string & Format<"date-time">`. ALWAYS call `.toISOString()`:
+
+```typescript
+// ❌ WRONG — causes: Type 'Date' is not assignable to type 'string & Format<"date-time">'
+createdAt: input.created_at,           // Date from Prisma
+updatedAt: new Date(),                 // Date object
+
+// ✅ FIX
+createdAt: input.created_at.toISOString(),
+updatedAt: new Date().toISOString(),
+```
+
+**Nullable Date → Required DTO field**: When `DateTime?` (nullable) maps to `string & Format<"date-time">` (required), choose a default that reflects the field's semantic meaning:
 
 ```typescript
 // ❌ WRONG: new Date() = "already expired" — semantically opposite of "unlimited"
@@ -185,7 +197,7 @@ expiredAt: (input.expired_at ?? new Date()).toISOString(),
 expiredAt: (input.expired_at ?? new Date("9999-12-31T23:59:59.999Z")).toISOString(),
 ```
 
-When `DateTime?` maps to `(string & Format<"date-time">) | null` (nullable DTO), `?? null` is correct:
+**Nullable Date → Nullable DTO field**: When `DateTime?` maps to `(string & Format<"date-time">) | null` (nullable DTO), `?? null` is correct:
 
 ```typescript
 deletedAt: input.deleted_at?.toISOString() ?? null,

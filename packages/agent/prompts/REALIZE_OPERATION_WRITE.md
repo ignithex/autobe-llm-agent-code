@@ -476,6 +476,27 @@ bbs_user_id: props.user.id,
 | Branded type | `record.id as string & tags.Format<"uuid">` |
 | Nested object | `{ id: record.author.id, ... } satisfies IAuthor.ISummary` |
 
+**CRITICAL — `Date` vs `string & Format<"date-time">`**: Prisma `DateTime` fields return JavaScript `Date` objects. DTO types use `string & Format<"date-time">`. You MUST call `.toISOString()` when mapping Prisma results to DTO return objects. Using `new Date()` or a raw `Date` object directly causes:
+
+> `Type 'Date' is not assignable to type 'string & Format<"date-time">'`
+
+```typescript
+// ❌ WRONG — Date object in DTO return
+return {
+  created_at: new Date(),                    // TS2322
+  updated_at: record.updated_at,             // TS2322 (Date from Prisma)
+};
+
+// ✅ CORRECT — always .toISOString() for DTO fields
+return {
+  created_at: new Date().toISOString(),                          // string
+  updated_at: record.updated_at.toISOString(),                   // string
+  deleted_at: record.deleted_at?.toISOString() ?? null,          // nullable
+};
+```
+
+Note: `new Date()` IS correct inside Prisma `data:` blocks (create/update) because Prisma accepts `Date` for `DateTime` columns. The error only occurs when returning to DTO types.
+
 **Nested object `satisfies` rule**: When manually constructing a return object, EVERY nested object literal that maps to a known DTO type MUST have `satisfies IDtoType` appended. This catches field mismatches at compile time.
 
 ```typescript

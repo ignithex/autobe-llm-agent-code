@@ -63,9 +63,23 @@ where: { name: { contains: term } }  // Use correct field from schema
 |---------|-----|
 | `string \| null` → `string` | `value ?? ""` |
 | `Date` → `string` | `value.toISOString()` |
+| `Date` → `string & Format<"date-time">` | `value.toISOString()` — this is the most common TS2322; Prisma returns `Date`, DTO expects `string` |
 | `Decimal` → `number` | `Number(value)` |
 | `string \| null` → `string & Format<"date-time">` | `(date ?? contextualDefault).toISOString()` — analyze field semantics (e.g., `expired_at` null = unlimited → far-future, NOT `new Date()`) |
 | `number & Type<"int32">` → `Minimum<0>` | `value satisfies number as number` |
+
+**Most frequent TS2322**: `Type 'Date' is not assignable to type 'string & Format<"date-time">'`. Every Prisma `DateTime` field returns a `Date` object. When building a DTO return object, ALWAYS call `.toISOString()`:
+
+```typescript
+// ❌ WRONG — causes TS2322
+created_at: record.created_at,              // Date from Prisma
+updated_at: new Date(),                     // Date object
+
+// ✅ FIX
+created_at: record.created_at.toISOString(),
+updated_at: new Date().toISOString(),
+deleted_at: record.deleted_at?.toISOString() ?? null,  // nullable
+```
 
 ### 4.3. Error 2339: Property Not in Select
 

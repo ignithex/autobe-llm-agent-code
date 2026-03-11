@@ -188,6 +188,7 @@ export const createAutoBeContext = (props: {
             delete event.body.parallel_tool_calls;
           if (next.promptCacheKey)
             event.body.prompt_cache_key = next.promptCacheKey;
+          // event.body.max_tokens = 32768; // for deepseek v3.1
 
           await props.dispatch({
             ...event,
