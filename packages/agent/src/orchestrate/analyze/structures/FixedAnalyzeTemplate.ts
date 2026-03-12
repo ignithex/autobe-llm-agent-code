@@ -81,18 +81,12 @@ export interface FixedAnalyzeTemplateUnitTemplate {
 export type FixedAnalyzeTemplateFeatureId =
   | "real-time"
   | "external-integration"
-  | "background-processing"
   | "file-storage";
 
 export interface FixedAnalyzeTemplateFeature {
   id: FixedAnalyzeTemplateFeatureId;
   /** Provider names for external-integration (e.g., ["stripe", "sendgrid"]) */
   providers?: string[];
-  /**
-   * Job names for background-processing (e.g., ["emailQueue",
-   * "reportGeneration"])
-   */
-  jobs?: string[];
 }
 
 // ─────────────────────────────────────────────
@@ -121,10 +115,7 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
     documentType: "overview",
     description: "Project summary, scope, glossary, and assumptions",
     downstreamPhase: "project-setup",
-    forbiddenPatterns: [
-      /\bTHE\s+system\s+SHALL\b/i, // EARS requirements belong in 03/04
-      /\bTHE\s+system\s+SHOULD\b/i,
-    ],
+    forbiddenPatterns: [],
     modules: [
       {
         index: 0,
@@ -246,27 +237,22 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
         index: 0,
         title: "Actor Definitions",
         purpose:
-          "Define all user actor types with their roles and what they can do.",
+          "Define all user actor types with their identity, permissions, and access boundaries.",
         unitStrategy: {
           type: "perActor",
           unitTemplate: {
             titlePattern: "{name} Actor",
             purposePattern:
-              "Define the {name} actor's role and capabilities in business terms.",
-            keywords: [
-              "actor",
-              "role",
-              "permissions",
-              "capabilities",
-              "authorization",
-            ],
+              "Define the {name} actor's identity, permissions, and access boundaries. Do NOT describe specific operations (03), data isolation policies (05), or domain concepts (02).",
+            keywords: ["actor", "role", "permissions", "access-boundary"],
           },
         },
       },
       {
         index: 1,
         title: "Authentication Flows",
-        purpose: "Registration, login, session management, and token policies.",
+        purpose:
+          "Registration, login, logout, and session management from a user perspective.",
         unitStrategy: {
           type: "fixed",
           units: [
@@ -274,19 +260,13 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
               titlePattern: "Registration and Login",
               purposePattern:
                 "Define user registration and login flows including validation and error handling.",
-              keywords: [
-                "registration",
-                "login",
-                "authentication",
-                "signup",
-                "signin",
-              ],
+              keywords: ["registration", "login", "authentication"],
             },
             {
-              titlePattern: "Session and Token Policy",
+              titlePattern: "Session and Logout",
               purposePattern:
-                "Define session duration, token refresh, and expiration policies.",
-              keywords: ["session", "token", "refresh", "expiration", "jwt"],
+                "Define session behavior and logout from a user perspective.",
+              keywords: ["session", "logout", "account-security"],
             },
           ],
         },
@@ -294,20 +274,18 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
       {
         index: 2,
         title: "Account Lifecycle",
-        purpose: "Account state transitions and lifecycle management.",
+        purpose: "Account creation, deletion, and password management.",
         unitStrategy: {
           type: "fixed",
           units: [
             {
-              titlePattern: "Account States and Transitions",
+              titlePattern: "Account Management",
               purposePattern:
-                "Define account states (active, suspended, deleted) and valid transitions.",
+                "Define how users create accounts, delete accounts, and change passwords.",
               keywords: [
-                "account-state",
-                "lifecycle",
-                "suspension",
-                "deletion",
-                "deactivation",
+                "account-creation",
+                "account-deletion",
+                "password-change",
               ],
             },
           ],
@@ -334,20 +312,15 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
       {
         index: 0,
         title: "Domain Concepts",
-        purpose: "Describe what each concept means to users and why it exists.",
+        purpose:
+          "Describe what each concept means in the business domain and its key attributes.",
         unitStrategy: {
           type: "perEntity",
           unitTemplate: {
             titlePattern: "{name} Concept",
             purposePattern:
-              "Describe what {name} represents in the business domain, its purpose, and how users interact with it.",
-            keywords: [
-              "concept",
-              "domain",
-              "business-meaning",
-              "purpose",
-              "user-interaction",
-            ],
+              "Describe what {name} represents in the business domain and its key attributes. Do NOT describe operations or workflows — those belong in 03-functional-requirements.",
+            keywords: ["concept", "domain", "business-meaning", "attributes"],
           },
         },
       },
@@ -374,7 +347,7 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
             {
               titlePattern: "Lifecycle and Retention",
               purposePattern:
-                "Describe business rules for concept lifecycle and data retention from a user perspective.",
+                "Describe concept lifecycle states and transitions only. Detailed retention/recovery policies belong in 05-non-functional. Operation details belong in 03-functional-requirements.",
               keywords: [
                 "lifecycle",
                 "retention",
@@ -465,27 +438,6 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
       },
       {
         index: 1,
-        title: "Business Actions and Workflows",
-        purpose: "Business actions and workflows beyond basic CRUD.",
-        unitStrategy: {
-          type: "perEntityGroup",
-          unitTemplate: {
-            titlePattern: "{name} Actions",
-            purposePattern:
-              "Define business actions and workflows for the {name} domain group from a functional requirements perspective.",
-            keywords: [
-              "action",
-              "workflow",
-              "business-process",
-              "trigger",
-              "authentication-flow",
-              "authorization",
-            ],
-          },
-        },
-      },
-      {
-        index: 2,
         title: "Error Scenarios and Edge Cases",
         purpose:
           "Business-level error scenarios, edge case coverage, and expected system behaviors for exceptional conditions.",
@@ -506,24 +458,25 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
         },
       },
       {
-        index: 3,
+        index: 2,
         title: "End-to-End User Scenarios",
         purpose:
-          "Cross-domain user scenarios, multi-step business flows, and end-to-end use cases.",
+          "Cross-domain user scenarios that span multiple concepts, describing complete user journeys.",
         unitStrategy: {
-          type: "perEntityGroup",
-          unitTemplate: {
-            titlePattern: "{name} User Scenarios",
-            purposePattern:
-              "Define end-to-end user scenarios involving {name} and related concepts, describing business flows from the user's perspective.",
-            keywords: [
-              "user-scenario",
-              "use-case",
-              "end-to-end",
-              "multi-step",
-              "cross-domain",
-            ],
-          },
+          type: "fixed",
+          units: [
+            {
+              titlePattern: "Cross-Domain User Scenarios",
+              purposePattern:
+                "Define end-to-end user scenarios that span multiple concepts, describing complete user journeys from start to finish.",
+              keywords: [
+                "user-scenario",
+                "end-to-end",
+                "multi-step",
+                "user-journey",
+              ],
+            },
+          ],
         },
       },
     ],
@@ -536,7 +489,7 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
     filename: "04-business-rules.md",
     documentType: "business-rules",
     description:
-      "Data isolation, business rules, data browsing expectations, error scenarios",
+      "Business rules, validation constraints, data browsing expectations, error scenarios",
     downstreamPhase: "service-layer",
     forbiddenPatterns: [
       /```yaml\s*\n\s*entity:/i, // Entity YAML specs → 02
@@ -545,29 +498,6 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
     modules: [
       {
         index: 0,
-        title: "Data Isolation and Ownership",
-        purpose:
-          "Data ownership rules and tenant/user-level isolation policies.",
-        unitStrategy: {
-          type: "fixed",
-          units: [
-            {
-              titlePattern: "Ownership and Isolation Rules",
-              purposePattern:
-                "Define data ownership semantics and isolation boundaries for multi-user access.",
-              keywords: [
-                "ownership",
-                "isolation",
-                "tenant",
-                "multi-user",
-                "data-access",
-              ],
-            },
-          ],
-        },
-      },
-      {
-        index: 1,
         title: "Domain Business Rules",
         purpose:
           "Per-concept business rules, validation logic, and domain constraints.",
@@ -576,7 +506,7 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
           unitTemplate: {
             titlePattern: "{name} Rules",
             purposePattern:
-              "Define business rules, validation logic, and domain constraints for {name}.",
+              "Define validation rules and domain constraints for {name}. Do NOT repeat data isolation (05), lifecycle states (02), or operation flows (03).",
             keywords: [
               "business-rule",
               "validation",
@@ -587,22 +517,7 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
         },
       },
       {
-        index: 2,
-        title: "Business Validation Criteria",
-        purpose:
-          "Business-level validation expectations and data quality criteria.",
-        unitStrategy: {
-          type: "perEntity",
-          unitTemplate: {
-            titlePattern: "{name} Validation Criteria",
-            purposePattern:
-              "Define business validation expectations for {name}, including acceptable data quality criteria.",
-            keywords: ["validation", "boundary-value", "format-requirement"],
-          },
-        },
-      },
-      {
-        index: 3,
+        index: 1,
         title: "Data Browsing Expectations",
         purpose:
           "Business expectations for how users browse, find, and navigate through lists of data.",
@@ -619,7 +534,7 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
         },
       },
       {
-        index: 4,
+        index: 2,
         title: "Error Conditions",
         purpose: "Business error scenarios and how the system should respond.",
         unitStrategy: {
@@ -648,8 +563,7 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
     fileId: "05-non-functional",
     filename: "05-non-functional.md",
     documentType: "non-functional",
-    description:
-      "Performance SLOs, security policies, data integrity, storage requirements",
+    description: "Data ownership, privacy, retention, and recovery policies",
     downstreamPhase: "test-infra",
     forbiddenPatterns: [
       /\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/\w+/i, // API endpoint defs → 03
@@ -658,133 +572,32 @@ export const FIXED_ANALYZE_TEMPLATE: FixedAnalyzeTemplateFileTemplate[] = [
     modules: [
       {
         index: 0,
-        title: "Performance Requirements",
-        purpose: "Performance SLOs and scalability targets.",
-        unitStrategy: {
-          type: "fixed",
-          units: [
-            {
-              titlePattern: "Performance SLOs",
-              purposePattern:
-                "Define response time targets, throughput limits, and scalability requirements.",
-              keywords: [
-                "performance",
-                "slo",
-                "latency",
-                "throughput",
-                "scalability",
-              ],
-            },
-            {
-              titlePattern: "Rate Limiting and Throttling",
-              purposePattern:
-                "Define rate limiting policies and abuse prevention requirements.",
-              keywords: [
-                "rate-limit",
-                "throttling",
-                "abuse-prevention",
-                "cooldown",
-              ],
-            },
-          ],
-        },
-      },
-      {
-        index: 1,
-        title: "Security Requirements",
-        purpose: "Security policies, encryption, and compliance requirements.",
-        unitStrategy: {
-          type: "fixed",
-          units: [
-            {
-              titlePattern: "Security Policies",
-              purposePattern:
-                "Define security policies including encryption, input validation, and compliance.",
-              keywords: [
-                "security",
-                "encryption",
-                "compliance",
-                "input-validation",
-                "owasp",
-              ],
-            },
-            {
-              titlePattern: "Availability and Reliability",
-              purposePattern:
-                "Define availability targets, reliability expectations, and failover policies.",
-              keywords: [
-                "availability",
-                "uptime",
-                "error-budget",
-                "reliability",
-              ],
-            },
-          ],
-        },
-      },
-      {
-        index: 2,
-        title: "Data Integrity and Storage",
-        purpose: "Data integrity constraints and storage requirements.",
-        unitStrategy: {
-          type: "fixed",
-          units: [
-            {
-              titlePattern: "Data Integrity and Storage",
-              purposePattern:
-                "Define backup policies, data retention, and storage tier requirements.",
-              keywords: [
-                "data-integrity",
-                "backup",
-                "retention",
-                "storage",
-                "consistency",
-              ],
-            },
-            {
-              titlePattern: "Audit and Observability",
-              purposePattern:
-                "Define audit logging, monitoring, alerting, and observability requirements.",
-              keywords: [
-                "audit",
-                "logging",
-                "monitoring",
-                "alerting",
-                "observability",
-              ],
-            },
-          ],
-        },
-      },
-      {
-        index: 3,
-        title: "Concurrency and Data Consistency",
+        title: "Data Policies",
         purpose:
-          "Concurrency control policies, race condition handling, and data consistency guarantees.",
+          "Data ownership, privacy, retention, and recovery policies from a business perspective.",
         unitStrategy: {
           type: "fixed",
           units: [
             {
-              titlePattern: "Concurrency Control Policies",
+              titlePattern: "Data Ownership and Privacy",
               purposePattern:
-                "Define optimistic/pessimistic locking strategies, conflict resolution, and retry semantics for concurrent operations.",
+                "Define who owns what data, who can access it, and privacy boundaries between users.",
               keywords: [
-                "concurrency",
-                "locking",
-                "conflict-resolution",
-                "race-condition",
-                "retry-semantics",
+                "data-isolation",
+                "ownership",
+                "access-control",
+                "privacy",
               ],
             },
             {
-              titlePattern: "Data Consistency Guarantees",
+              titlePattern: "Data Retention and Recovery",
               purposePattern:
-                "Define consistency models, transactional boundary requirements, and idempotency guarantees.",
+                "Define what happens to deleted data, how long it is retained, and how users can recover it.",
               keywords: [
-                "consistency",
-                "transaction-boundary",
-                "atomicity",
-                "idempotency",
+                "soft-delete",
+                "retention",
+                "recovery",
+                "permanent-deletion",
               ],
             },
           ],
@@ -927,74 +740,6 @@ export const FIXED_ANALYZE_TEMPLATE_CONDITIONAL_MODULES: Record<
                 "degradation",
                 "external-availability",
               ],
-            },
-          ],
-        },
-      },
-    },
-  ],
-  "background-processing": [
-    {
-      targetCategory: "03-functional-requirements",
-      module: {
-        index: 102,
-        title: "Background Processing",
-        purpose:
-          "Asynchronous job definitions, queue specifications, and scheduled task configurations.",
-        unitStrategy: {
-          type: "fixed",
-          units: [
-            {
-              titlePattern: "Job Specifications",
-              purposePattern:
-                "Define background jobs, queue configurations, retry policies, and scheduling rules for asynchronous processing.",
-              keywords: [
-                "background-job",
-                "queue",
-                "cron",
-                "async",
-                "scheduled-task",
-              ],
-            },
-          ],
-        },
-      },
-    },
-    {
-      targetCategory: "04-business-rules",
-      module: {
-        index: 101,
-        title: "Job Failure Policies",
-        purpose:
-          "Failure handling and dead-letter queue policies for background jobs.",
-        unitStrategy: {
-          type: "fixed",
-          units: [
-            {
-              titlePattern: "Job Failure and Recovery",
-              purposePattern:
-                "Define failure handling, recovery procedures, and notification requirements for background jobs.",
-              keywords: ["job-failure", "retry", "recovery", "notification"],
-            },
-          ],
-        },
-      },
-    },
-    {
-      targetCategory: "05-non-functional",
-      module: {
-        index: 102,
-        title: "Queue Performance",
-        purpose:
-          "Performance requirements for message queues and background processing.",
-        unitStrategy: {
-          type: "fixed",
-          units: [
-            {
-              titlePattern: "Queue Performance SLOs",
-              purposePattern:
-                "Define performance requirements for background job processing.",
-              keywords: ["queue-throughput", "processing-latency"],
             },
           ],
         },
@@ -1209,6 +954,8 @@ export const buildFixedAnalyzeCanonicalSourceContent = (): string => {
     "| Error conditions | [04-business-rules.md](./04-business-rules.md) |",
     "| Permissions | [01-actors-and-auth.md](./01-actors-and-auth.md) |",
     "| Actor definitions | [01-actors-and-auth.md](./01-actors-and-auth.md) |",
+    "| Filtering/pagination rules | [04-business-rules.md](./04-business-rules.md) |",
+    "| Data retention/recovery | [05-non-functional.md](./05-non-functional.md) |",
   ].join("\n");
   return `${header}\n${table}`;
 };

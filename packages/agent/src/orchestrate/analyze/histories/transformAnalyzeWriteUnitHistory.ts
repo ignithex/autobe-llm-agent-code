@@ -116,7 +116,7 @@ export const transformAnalyzeWriteUnitHistory = (
         ### Pre-defined Unit Sections (FIXED — do NOT change titles or purposes)
 
         The following unit sections are pre-defined by the template. You MUST write
-        \`content\` (8-20 sentences) and \`keywords\` (7-18 structured anchors) for EACH unit below.
+        \`content\` (5-15 sentences) and \`keywords\` (7-18 structured anchors) for EACH unit below.
         Do NOT add, remove, or rename any units.
 
         ${expandedUnits
@@ -124,7 +124,7 @@ export const transformAnalyzeWriteUnitHistory = (
             (unit, index) => `
         **Unit ${index + 1}**: ${unit.titlePattern}
         - **Purpose**: ${unit.purposePattern}
-        - **Template Keywords** (for reference, expand with domain-specific terms): ${unit.keywords.join(", ")}
+        - **Template Keywords** (use as starting points — only add keywords traceable to the original user requirements above): ${unit.keywords.join(", ")}
         `,
           )
           .join("\n")}

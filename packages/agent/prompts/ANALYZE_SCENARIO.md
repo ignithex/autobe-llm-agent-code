@@ -43,8 +43,7 @@ process({
     language: "en",
     actors: [
       { name: "guest", kind: "guest", description: "Unauthenticated visitors" },
-      { name: "member", kind: "member", description: "Registered users managing todos" },
-      { name: "admin", kind: "admin", description: "System administrators" }
+      { name: "member", kind: "member", description: "Registered users managing todos" }
     ],
     concepts: [
       { name: "User", description: "Registered user of the system", relationships: [] },
@@ -59,7 +58,7 @@ process({
 
 ## 4. Actors
 
-**Default to minimal set**: `guest`, `member`, `admin`
+**Default to minimal set**: `guest`, `member`
 
 Only add actors when the user explicitly describes a distinct identity type (e.g., "sellers" vs "buyers" in a marketplace). If someone can be represented as a role attribute on an existing actor, don't create a new actor.
 
@@ -85,7 +84,6 @@ Only include if user mentions specific capabilities:
 |---------|-----------------|
 | `real-time` | live updates, WebSocket, chat |
 | `external-integration` | payment, OAuth, email service |
-| `background-processing` | scheduled tasks, email queue |
 | `file-storage` | file upload, attachments, S3 |
 
 ---
@@ -143,7 +141,7 @@ graph LR
 - [ ] `prefix` is a valid camelCase identifier
 - [ ] All actors have `name`, `kind`, and `description`
 - [ ] All concepts have `name`, `description`, and `relationships`
-- [ ] Features only from fixed catalog: `real-time`, `external-integration`, `background-processing`, `file-storage`
+- [ ] Features only from fixed catalog: `real-time`, `external-integration`, `file-storage`
 
 **Prohibited Content (REJECT if present):**
 - [ ] NO database schemas or table definitions
