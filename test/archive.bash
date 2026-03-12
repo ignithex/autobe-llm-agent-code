@@ -16,6 +16,12 @@ pnpm run archive:go --vendor qwen/qwen3.5-122b-a10b --useToolChoice false --proj
 pnpm run archive:go --vendor qwen/qwen3.5-122b-a10b --useToolChoice false --project reddit > archive.qwen-qwen3.5-122b-a10b.reddit.log
 pnpm run archive:go --vendor qwen/qwen3.5-122b-a10b --useToolChoice false --project shopping > archive.qwen-qwen3.5-122b-a10b.shopping.log
 
+# qwen/qwen3.5-27b (0.195)
+pnpm run archive:go --vendor qwen/qwen3.5-27b --useToolChoice false --project todo > archive.qwen-qwen3.5-27b.todo.log
+pnpm run archive:go --vendor qwen/qwen3.5-27b --useToolChoice false --project bbs > archive.qwen-qwen3.5-27b.bbs.log
+pnpm run archive:go --vendor qwen/qwen3.5-27b --useToolChoice false --project reddit > archive.qwen-qwen3.5-27b.reddit.log
+pnpm run archive:go --vendor qwen/qwen3.5-27b --useToolChoice false --project shopping > archive.qwen-qwen3.5-27b.shopping.log
+
 # qwen/qwen3.5-35b-a3b (0.1625)
 pnpm run archive:go --vendor qwen/qwen3.5-35b-a3b  --useToolChoice false --project todo > archive.qwen-qwen3.5-35b-a3b.todo.log
 pnpm run archive:go --vendor qwen/qwen3.5-35b-a3b  --useToolChoice false --project bbs > archive.qwen-qwen3.5-35b-a3b.bbs.log
