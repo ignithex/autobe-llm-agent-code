@@ -643,7 +643,17 @@ Conversely, this pattern doesn't fit domains where deterministic validators can'
 
 ## 4. Why Qwen
 
-### 4.1. R&D Cost: Users vs. Developers
+### 4.1. Function Calling Performance: Best in Class for Small/Medium Models
+
+Let me start with the most direct answer to "why Qwen?"
+
+AutoBe's entire pipeline is function calling. Whether a model writes good prose or carries on a smooth conversation doesn't matter. The only criterion is how accurately it fills complex JSON Schemas.
+
+Qwen is not the only open-weight model that does function calling well. GLM, Kimi, and others deliver strong function calling performance at large model scales. But at the **small and medium scale**, Qwen was the only one that could handle function calling of this complexity.
+
+Even a compact 3B-active-parameter MoE model supports tool choice and processes complex schemas containing 10+ variant recursive unions. For AutoBe, this small/medium-scale performance was decisive — the reasons why continue in the following sections.
+
+### 4.2. R&D Cost: Users vs. Developers
 
 For customers **using** AutoBe, model cost isn't an issue. Even the most expensive model is cheaper than actually hiring a backend developer.
 
@@ -651,7 +661,7 @@ But for us **developing** AutoBe, it's different. Every time we design a new typ
 
 Local models make this R&D cycle possible. We can experiment without limit, without worrying about cost. The journey from 6.75% to 100% required hundreds of experiment cycles, and that was only possible because the models were local.
 
-### 4.2. Small Models Make the Best QA Engineers
+### 4.3. Small Models Make the Best QA Engineers
 
 Large models make fewer mistakes. That's an advantage — and simultaneously a disadvantage.
 
@@ -670,13 +680,13 @@ AI is probabilistic. Large models make mistakes **less often**, not **never**. C
 
 **When the schema is precise enough that even a 35B model can't misinterpret it, the probability of a strong model getting it wrong converges to effectively zero.**
 
-### 4.3. No Vendor Lock-In
+### 4.4. No Vendor Lock-In
 
 Price changes, model deprecation, and rate limits for commercial APIs are entirely at the vendor's discretion. The model you use today could disappear tomorrow.
 
 AutoBe's function calling schemas are designed to be model-neutral. We don't use model-specific prompt tricks. JSON Schema and type-based validation are industry standards — the code stays the same even when the model changes.
 
-### 4.4. Open Source + Open Weights: A Virtuous Cycle
+### 4.5. Open Source + Open Weights: A Virtuous Cycle
 
 AutoBe is open source (AGPL 3.0), and Qwen is open-weight. Both are part of the open ecosystem.
 
