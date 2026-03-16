@@ -295,7 +295,7 @@ const llmOutput = `
 const result = func.parse(llmOutput);
 // Markdown 코드블록, 설명 텍스트, 따옴표 없는 key, 후행 쉼표,
 // 이중 stringify, string→number, 불완전 키워드, 닫히지 않은 bracket
-// — 7가지 문제가 동시에 발생했지만, parse() 한 번으로 전부 처리된다.
+// — 8가지 문제가 동시에 발생했지만, parse() 한 번으로 전부 처리된다.
 ```
 
 ### 2.3. Schema-Based Type Coercion: 스키마를 아는 교정
