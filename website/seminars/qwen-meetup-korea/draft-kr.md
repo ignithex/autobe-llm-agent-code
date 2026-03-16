@@ -6,27 +6,22 @@
 
 ### TL;DR
 
-- **1. [AutoBe](https://github.com/wrtnlabs/autobe)** — function calling 올인으로 만든 백엔드 AI 에이전트
-  - 자연어 대화로 완전한 백엔드를 생성하는 오픈소스 AI 에이전트
-  - LLM이 코드를 직접 쓰지 않는다. 타입 구조체를 function calling으로 채우고, 컴파일러가 코드로 변환
-  - 시스템 프롬프트가 빠진 빌드를 배포했는데 아무도 몰랐다 — 타입이 가장 좋은 프롬프트였다
-  - Qwen 3.5 시리즈 4개 모델 전부 컴파일 성공률 100%
-- **2. [Typia](https://github.com/samchon/typia)** — function calling의 전체 라이프사이클을 자동화하는 인프라
-  - TypeScript 타입 하나로 스키마 생성 → 파싱 → 타입 교정 → 검증 → 피드백
-  - raw 성공률이 극히 낮아도, Typia의 인프라가 100%로 끌어올린다
-    - `qwen3-coder-next`: 6.75% → 100% (validation feedback)
-    - `qwen3.5` 시리즈: 0% → 100% (type coercion)
-  - 타입이 곧 스키마이자 validator이자 프롬프트
-- **3. Function Calling 예찬론** — 정확성을 요하는 도메인을 위한 방법론
-  - 스키마를 정의하고 필드마다 설명을 다는 것이, 자연어 프롬프트보다 명확하고 기계적으로 검증 가능하다
-  - 핑크 코끼리 문제 없음: 금지가 아닌 구조적 부재로 제약
-  - 모델 중립: 동일한 스키마, 동일한 파이프라인으로 모든 모델 대응
-  - 핵심: Typed Schema + Deterministic Validator + Structured Feedback = Reliable Output
-- **4. 왜 Qwen인가** — R&D 비용, 엣지케이스 발굴, 열린 생태계
-  - 수천 번의 실험 사이클에 로컬 모델 필수
-  - 작은 모델이 최고의 QA 엔지니어 — 엣지케이스 발굴로 전체 시스템 강화
-  - 오픈소스(AutoBe) + 오픈웨이트(Qwen)의 선순환
-- **LLM이 정확할 필요는 없다 — 교정 가능하면 된다**
+1. [AutoBe](https://github.com/wrtnlabs/autobe)
+   - function calling 올인으로 만든 백엔드 AI 에이전트
+   - LLM이 코드를 쓰지 않는다. 타입 구조체를 채우고, 컴파일러가 코드로 변환
+   - Qwen 4종 전부 컴파일 성공률 100%
+2. [Typia](https://github.com/samchon/typia)
+   - function calling의 전체 라이프사이클을 자동화하는 인프라
+   - 스키마 생성 → lenient parsing → type coercion → validation feedback
+   - qwen3-coder-next 6.75% → 100%, qwen3.5 시리즈 0% → 100%
+3. Function Calling 예찬론
+   - 정확성을 요하는 도메인을 위한 방법론
+   - 금지가 아닌 구조적 부재로 제약, 모델 중립, 기계적 검증 가능
+4. 왜 Qwen인가
+   - R&D에 로컬 모델 필수
+   - 작은 모델이 최고의 QA
+   - 열린 생태계
+5. LLM이 정확할 필요는 없다, 교정 가능하면 된다
 
 ---
 
