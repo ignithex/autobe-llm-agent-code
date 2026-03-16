@@ -47,6 +47,7 @@ export const orchestrateAnalyzeSectionCrossFileReview = async (
       status: "approved" | "rewritten" | "new";
     }>;
     mechanicalViolationSummary?: string;
+    fileDecisions?: import("./utils/detectDecisionConflicts").IFileDecisions[];
     progress: AutoBeProgressEventBase;
     promptCacheKey: string;
     retry: number;
@@ -77,6 +78,7 @@ export const orchestrateAnalyzeSectionCrossFileReview = async (
         scenario: props.scenario,
         allFileSummaries: props.allFileSummaries,
         mechanicalViolationSummary: props.mechanicalViolationSummary,
+        fileDecisions: props.fileDecisions,
         preliminary,
       }),
     });
