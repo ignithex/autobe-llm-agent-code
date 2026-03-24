@@ -7,11 +7,11 @@ Your task: compare the **implementation code** against the **ground truth specif
 
 ## What Counts as Hallucination
 
-1. **Phantom Endpoints** — Controller routes that do not exist in the OpenAPI spec
+1. **Phantom Endpoints** — Controller routes that have NO plausible mapping to any OpenAPI path (completely fabricated routes with no resemblance to any spec endpoint). Note: minor path differences (e.g., `/users/:id` vs `/users/{id}`, prefix variations, plural/singular) are NOT phantom — only flag truly non-existent operations.
 2. **Fabricated Fields** — Properties/columns used in code but not defined in Prisma schema or OpenAPI DTOs
 3. **Wrong Relations** — Prisma relations referenced incorrectly (wrong model, wrong cardinality)
 4. **Spec Mismatch** — Implementation logic that contradicts the OpenAPI operation definition (wrong HTTP method, wrong path parameters, wrong request/response body)
-5. **Invented Logic** — Business logic that has no basis in the specification (e.g., adding authorization checks, validation rules, or transformations not specified)
+5. **Invented Logic** — Business logic that has no basis in the specification (e.g., adding complex business rules, workflows, or transformations not implied by the spec)
 
 ## What Does NOT Count as Hallucination
 
@@ -22,6 +22,9 @@ Your task: compare the **implementation code** against the **ground truth specif
 - Standard CRUD patterns when the spec defines CRUD endpoints
 - Prefixed table names via `@@map()` — this is an AutoBE convention, not hallucination
 - Prefixed model names like `ProjectNameEntity` — this is an AutoBE convention
+- Authorization guards, authentication checks, and role-based access control — AutoBE commonly adds these as standard security practice even if not explicitly in the spec
+- Additional validation logic (input sanitization, type checking) beyond what the spec defines — this is defensive programming, not hallucination
+- Routes that are minor variations of spec paths (different prefix, plural/singular, nested vs flat) — only flag routes with NO corresponding spec operation at all
 
 ## Evaluation Guidelines
 
@@ -32,6 +35,18 @@ Your task: compare the **implementation code** against the **ground truth specif
 - Report each unique issue ONCE with all affected files listed
 - Prioritize phantom endpoints and fabricated fields (most impactful hallucinations)
 - Score 100 = zero hallucinations detected, score 0 = pervasive hallucinations throughout
+
+## DeepEval Sub-Scores
+
+In addition to the overall score, provide three sub-scores (each 0-100) based on the DeepEval framework:
+
+1. **Faithfulness** — Does the code faithfully implement what the spec defines? Penalize phantom endpoints, fabricated fields, and spec contradictions. Score 100 = every code element has a spec basis.
+
+2. **Relevancy** — Is every piece of generated code relevant to the project requirements? Penalize dead code, unused imports, unnecessary abstractions, and features not in the spec. Score 100 = zero irrelevant code.
+
+3. **Contextual Precision** — Does the code correctly map spec elements to the right implementation locations? Penalize wrong controller-to-model mappings, incorrect DTO field assignments, and mismatched route-to-operation wiring. Score 100 = perfect spec-to-code mapping.
+
+The overall `score` should be a weighted combination: `0.5 * faithfulness + 0.3 * relevancy + 0.2 * contextualPrecision`.
 
 ## Response Format
 
@@ -49,6 +64,11 @@ Respond ONLY with valid JSON:
     }
   ],
   "score": 85,
+  "deepEvalScores": {
+    "faithfulness": 90,
+    "relevancy": 80,
+    "contextualPrecision": 85
+  },
   "summary": "Brief assessment of hallucination level"
 }
 ```

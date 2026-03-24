@@ -21,6 +21,11 @@ const meta: MetaRecord = {
     type: "page",
     title: "📝 Blog Articles",
   },
+  benchmark: {
+    type: "page",
+    title: "📊 Benchmark",
+    href: "/benchmark/index.html",
+  },
   demo: {
     type: "page",
     title: "📚 Demonstrations",

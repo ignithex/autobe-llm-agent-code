@@ -3,12 +3,22 @@ import type { Issue } from "./issue";
 
 export const GATE_ERROR_THRESHOLD = 0.05;
 export const GATE_PENALTY_PER_PERCENT = 5;
-export const AGENT_WEIGHT_RATIO = 0.25;
+export const AGENT_WEIGHT_RATIO = 0.15;
 export const AGENT_WEIGHTS: Record<string, number> = {
-  SecurityAgent: 0.5, // 50% of agent portion
-  LLMQualityAgent: 0.5, // 50% of agent portion
-  // HallucinationAgent: reference-only (not scored yet)
+  SecurityAgent: 0.25, // 25% of agent portion — OWASP security audit (lowered: AutoBE auth guards are user-configured)
+  LLMQualityAgent: 0.4, // 40% of agent portion — AI code quality patterns (best discriminator)
+  HallucinationAgent: 0.35, // 35% of agent portion — spec compliance (OpenAPI + Prisma)
 };
+
+// Validate AGENT_WEIGHTS sum to 1.0 at module load
+{
+  const _weightSum = Object.values(AGENT_WEIGHTS).reduce((a, b) => a + b, 0);
+  if (Math.abs(_weightSum - 1.0) > 0.001) {
+    console.warn(
+      `[estimate] AGENT_WEIGHTS sum to ${_weightSum}, expected 1.0. Scores may be inaccurate.`,
+    );
+  }
+}
 
 /** Evaluation grade */
 export type Grade = "A" | "B" | "C" | "D" | "F";
@@ -40,11 +50,12 @@ export const PHASE_WEIGHTS: Record<Phase, number> = {
   // Gate (pass/fail, no weight)
   gate: 0,
   // New scoring phases
-  documentQuality: 0.05, // 5% (always 100, low discrimination)
-  requirementsCoverage: 0.25, // 25%
-  testCoverage: 0.25, // 25% (evaluator maturing, restore to 30% later)
-  logicCompleteness: 0.35, // 35% (best discriminator of real quality)
+  documentQuality: 0.05, // 5%
+  requirementsCoverage: 0.2, // 20%
+  testCoverage: 0.2, // 20%
+  logicCompleteness: 0.3, // 30% (best discriminator of real quality)
   apiCompleteness: 0.1, // 10%
+  goldenSet: 0.15, // 15% (runtime functional testing)
   // Legacy (not used in score)
   requirements: 0,
   database: 0,
@@ -55,8 +66,24 @@ export const PHASE_WEIGHTS: Record<Phase, number> = {
   quality: 0,
   safety: 0,
   llmSpecific: 0,
-  goldenSet: 0,
 };
+
+// Validate active PHASE_WEIGHTS sum to 1.0 at module load
+{
+  const _activeWeightSum = [
+    PHASE_WEIGHTS.documentQuality,
+    PHASE_WEIGHTS.requirementsCoverage,
+    PHASE_WEIGHTS.testCoverage,
+    PHASE_WEIGHTS.logicCompleteness,
+    PHASE_WEIGHTS.apiCompleteness,
+    PHASE_WEIGHTS.goldenSet,
+  ].reduce((a, b) => a + b, 0);
+  if (Math.abs(_activeWeightSum - 1.0) > 0.001) {
+    console.warn(
+      `[estimate] Active PHASE_WEIGHTS sum to ${_activeWeightSum}, expected 1.0. Scores may be inaccurate.`,
+    );
+  }
+}
 
 /** Phase display names */
 export const PHASE_NAMES: Record<Phase, string> = {
@@ -193,6 +220,8 @@ export interface EvaluationResult {
   meta: EvaluationResult.Meta;
   penalties?: EvaluationPenalties;
   agentEvaluations?: AgentResult[];
+  /** Code size and performance metrics (reference only) */
+  performanceMetrics?: Record<string, number | string>;
 }
 export namespace EvaluationResult {
   export interface Phases {

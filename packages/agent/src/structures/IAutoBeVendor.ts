@@ -62,8 +62,8 @@ export interface IAutoBeVendor {
    * or archive views where a more descriptive name is helpful (for example,
    * "Primary GPT-4", "Fast Drafting Model", or "Internal Llama Cluster").
    *
-   * When omitted, callers should fall back to displaying or logging the
-   * `model` value itself, or another sensible default derived from the model
+   * When omitted, callers should fall back to displaying or logging the `model`
+   * value itself, or another sensible default derived from the model
    * identifier.
    */
   label?: string | undefined;
