@@ -10,6 +10,7 @@ import { v7 } from "uuid";
 
 import { AutoBePlaygroundGlobal } from "../../AutoBePlaygroundGlobal";
 import { PaginationUtil } from "../../utils/PaginationUtil";
+import { AutoBePlaygroundConfigProvider } from "../config/AutoBePlaygroundConfigProvider";
 import { AutoBePlaygroundVendorModelProvider } from "../vendors/AutoBePlaygroundVendorModelProvider";
 import { AutoBePlaygroundVendorProvider } from "../vendors/AutoBePlaygroundVendorProvider";
 import { AutoBePlaygroundSessionEventProvider } from "./AutoBePlaygroundSessionEventProvider";
@@ -122,32 +123,54 @@ export namespace AutoBePlaygroundSessionProvider {
     return json.transform(record);
   };
 
+  /**
+   * Sentinel API key used to identify virtual/mock vendor sessions.
+   *
+   * @internal
+   */
+  export const VIRTUAL_API_KEY = "virtual-seed-no-api-key";
+
   export const create = async (props: {
     body: IAutoBePlaygroundSession.ICreate;
   }): Promise<IAutoBePlaygroundSession> => {
+    const { body } = props;
+
     // Validate vendor exists
     await AutoBePlaygroundGlobal.prisma.autobe_playground_vendors.findFirstOrThrow(
       {
-        where: { id: props.body.vendor_id, deleted_at: null },
+        where: { id: body.vendor_id, deleted_at: null },
         select: { id: true },
       },
     );
 
-    // Auto-register model under vendor
-    await AutoBePlaygroundVendorModelProvider.emplace({
-      vendorId: props.body.vendor_id,
-      model: props.body.model,
-    });
+    const config = await AutoBePlaygroundConfigProvider.get();
+    const locale = body.locale ?? config.locale;
+    const timezone = body.timezone ?? config.timezone;
+
+    // Determine model field: encode mock info as "vendor#project" when mock
+    const isMock = body.mock != null;
+    const model = isMock
+      ? `${body.mock!.vendor}#${body.mock!.project}`
+      : body.model;
+    const title =
+      body.title ?? (isMock ? `[Mock] ${body.mock!.project}` : null);
+
+    if (!isMock) {
+      await AutoBePlaygroundVendorModelProvider.emplace({
+        vendorId: body.vendor_id,
+        model: body.model,
+      });
+    }
 
     const record =
       await AutoBePlaygroundGlobal.prisma.autobe_playground_sessions.create({
         data: {
           id: v7(),
-          autobe_playground_vendor_id: props.body.vendor_id,
-          model: props.body.model,
-          locale: props.body.locale,
-          timezone: props.body.timezone,
-          title: props.body.title ?? null,
+          autobe_playground_vendor_id: body.vendor_id,
+          model,
+          locale,
+          timezone,
+          title,
           created_at: new Date(),
           completed_at: null,
           aggregate: {

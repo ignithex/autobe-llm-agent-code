@@ -14,7 +14,7 @@ import type { IConnection } from "@nestia/fetcher";
 import { PlainFetcher } from "@nestia/fetcher";
 import { WebSocketConnector } from "tgrid";
 import type { Driver } from "tgrid";
-import type { Primitive, tags } from "typia";
+import type { tags } from "typia";
 
 /**
  * List sessions with pagination.
@@ -53,8 +53,8 @@ export async function index(
   );
 }
 export namespace index {
-  export type Body = Primitive<IAutoBePlaygroundSession.IRequest>;
-  export type Output = Primitive<IPage<IAutoBePlaygroundSession.ISummary>>;
+  export type Body = IAutoBePlaygroundSession.IRequest;
+  export type Output = IPage<IAutoBePlaygroundSession.ISummary>;
 
   export const METADATA = {
     method: "PATCH",
@@ -100,7 +100,7 @@ export async function at(
   });
 }
 export namespace at {
-  export type Output = Primitive<IAutoBePlaygroundSession>;
+  export type Output = IAutoBePlaygroundSession;
 
   export const METADATA = {
     method: "GET",
@@ -120,9 +120,8 @@ export namespace at {
 /**
  * Create a new vibe coding session.
  *
- * Initializes a session bound to the specified vendor configuration. An
- * aggregate record for tracking phase progress and token usage is
- * automatically created alongside the session.
+ * Creates a session bound to a stored vendor configuration. The vendor's
+ * decrypted API key will be used when establishing the AI agent connection.
  *
  * @param body Session creation properties
  * @author Samchon
@@ -155,8 +154,8 @@ export async function create(
   );
 }
 export namespace create {
-  export type Body = Primitive<IAutoBePlaygroundSession.ICreate>;
-  export type Output = Primitive<IAutoBePlaygroundSession>;
+  export type Body = IAutoBePlaygroundSession.ICreate;
+  export type Output = IAutoBePlaygroundSession;
 
   export const METADATA = {
     method: "POST",
@@ -212,7 +211,7 @@ export async function update(
   );
 }
 export namespace update {
-  export type Body = Primitive<IAutoBePlaygroundSession.IUpdate>;
+  export type Body = IAutoBePlaygroundSession.IUpdate;
 
   export const METADATA = {
     method: "PUT",

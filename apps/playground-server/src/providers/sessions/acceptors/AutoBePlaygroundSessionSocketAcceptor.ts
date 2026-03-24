@@ -1,10 +1,14 @@
-import { AutoBeAgent } from "@autobe/agent";
+import { AutoBeAgent, AutoBeMockAgent, AutoBeTokenUsage } from "@autobe/agent";
 import { AutoBeConfigConstant } from "@autobe/agent/src/constants/AutoBeConfigConstant";
+import { AutoBeExampleStorage } from "@autobe/benchmark";
 import {
   AutoBeEventOfSerializable,
   AutoBeEventSnapshot,
+  AutoBeExampleProject,
   AutoBeHistory,
+  AutoBePhase,
   IAutoBeAgent,
+  IAutoBePlaygroundReplay,
   IAutoBePlaygroundSession,
   IAutoBeRpcListener,
   IAutoBeRpcService,
@@ -23,6 +27,7 @@ import { AutoBePlaygroundVendorProvider } from "../../vendors/AutoBePlaygroundVe
 import { AutoBePlaygroundSessionConnectionProvider } from "../AutoBePlaygroundSessionConnectionProvider";
 import { AutoBePlaygroundSessionEventProvider } from "../AutoBePlaygroundSessionEventProvider";
 import { AutoBePlaygroundSessionHistoryProvider } from "../AutoBePlaygroundSessionHistoryProvider";
+import { AutoBePlaygroundSessionProvider } from "../AutoBePlaygroundSessionProvider";
 import { AutoBePlaygroundSessionCompiler } from "./AutoBePlaygroundSessionCompiler";
 
 export namespace AutoBePlaygroundSessionSocketAcceptor {
@@ -63,7 +68,45 @@ export namespace AutoBePlaygroundSessionSocketAcceptor {
     connection: IEntity;
     acceptor: WebSocketAcceptor<unknown, IAutoBeRpcService, IAutoBeRpcListener>;
   }): Promise<void> => {
-    await startReplay(props);
+    const histories: AutoBeHistory[] =
+      await AutoBePlaygroundSessionHistoryProvider.getAll({
+        session: props.session,
+      });
+    const snapshots: AutoBeEventSnapshot[] =
+      await AutoBePlaygroundSessionEventProvider.getAll({
+        session: props.session,
+      });
+
+    const replayData: IAutoBePlaygroundReplay = buildReplayFromSnapshots(
+      props.session,
+      histories,
+      snapshots,
+    );
+
+    const agent = new AutoBeMockAgent({
+      replay: replayData,
+      compiler: () => AutoBePlaygroundSessionCompiler.get(),
+    });
+
+    await props.acceptor.accept(
+      new AutoBeRpcService({
+        agent,
+        listener: props.acceptor.getDriver(),
+        onStart: () => {},
+        onComplete: () => {},
+      }),
+    );
+    props.acceptor.ping(500);
+
+    // Read-only replay — push all snapshot events directly
+    const listener = props.acceptor.getDriver();
+    await sleep_for(100);
+    void listener.enable(false).catch(() => {});
+
+    for (const s of snapshots)
+      void (listener as any)[s.event.type](s.event).catch(() => {});
+
+    await props.acceptor.join();
   };
 
   const startReplay = async (props: {
@@ -80,44 +123,59 @@ export namespace AutoBePlaygroundSessionSocketAcceptor {
         session: props.session,
       });
 
+    // Determine if this is a mock session by checking the model field
+    // for the "vendor#project" encoding pattern.
+    const isMockSession = props.session.model.includes("#");
+
     // Decrypt vendor API key
     const apiKey = await AutoBePlaygroundVendorProvider.decryptApiKey(
       props.session.vendor.id,
     );
-    const agent: AutoBeAgent = await startCommunication({
-      ...props,
-      histories,
-      factory: async () =>
-        new AutoBeAgent({
-          vendor: {
-            api: new OpenAI({
-              apiKey,
-              baseURL: props.session.vendor.baseURL ?? undefined,
-            }),
-            model: props.session.model,
-            semaphore: props.session.vendor.semaphore,
-          },
-          config: {
-            locale: props.session.locale,
-            timezone: props.session.timezone,
-            timeout:
-              AutoBePlaygroundGlobal.env.PLAYGROUND_TIMEOUT === "NULL"
-                ? null
-                : Number(
-                    AutoBePlaygroundGlobal.env.PLAYGROUND_TIMEOUT ??
-                      AutoBeConfigConstant.TIMEOUT,
-                  ),
-          },
-          compiler: () => AutoBePlaygroundSessionCompiler.get(),
-          histories,
-        }),
-    });
+    const agent: IAutoBeAgent =
+      isMockSession ||
+      apiKey === AutoBePlaygroundSessionProvider.VIRTUAL_API_KEY
+        ? await startCommunication({
+            ...props,
+            histories,
+            factory: async () =>
+              new AutoBeMockAgent({
+                replay: await buildReplayFromExamples(props.session),
+                compiler: () => AutoBePlaygroundSessionCompiler.get(),
+              }),
+          })
+        : await startCommunication({
+            ...props,
+            histories,
+            factory: async () =>
+              new AutoBeAgent({
+                vendor: {
+                  api: new OpenAI({
+                    apiKey,
+                    baseURL: props.session.vendor.baseURL ?? undefined,
+                  }),
+                  model: props.session.model,
+                  semaphore: props.session.vendor.semaphore,
+                },
+                config: {
+                  locale: props.session.locale,
+                  timezone: props.session.timezone,
+                  timeout:
+                    AutoBePlaygroundGlobal.env.PLAYGROUND_TIMEOUT === "NULL"
+                      ? null
+                      : Number(
+                          AutoBePlaygroundGlobal.env.PLAYGROUND_TIMEOUT ??
+                            AutoBeConfigConstant.TIMEOUT,
+                        ),
+                },
+                compiler: () => AutoBePlaygroundSessionCompiler.get(),
+                histories,
+              }),
+          });
 
     const listener: Driver<IAutoBeRpcListener> = props.acceptor.getDriver();
     for (const s of snapshots) {
-      agent.getTokenUsage().assign(s.tokenUsage);
+      (agent.getTokenUsage() as AutoBeTokenUsage).assign(s.tokenUsage);
       void (listener as any)[s.event.type](s.event).catch(() => {});
-      await sleep_for(10);
     }
 
     // REPLAY NEVER ALLOWS CONVERSATION
@@ -206,5 +264,134 @@ export namespace AutoBePlaygroundSessionSocketAcceptor {
       ).catch(() => {});
     });
     return agent;
+  };
+
+  /**
+   * Build an {@link IAutoBePlaygroundReplay} from stored DB snapshots.
+   *
+   * Groups the flat snapshot array by phase based on event type prefix.
+   */
+  const buildReplayFromSnapshots = (
+    session: IAutoBePlaygroundSession.ISummary,
+    histories: AutoBeHistory[],
+    snapshots: AutoBeEventSnapshot[],
+  ): IAutoBePlaygroundReplay => {
+    const phaseMap: Record<AutoBePhase, AutoBeEventSnapshot[]> = {
+      analyze: [],
+      database: [],
+      interface: [],
+      test: [],
+      realize: [],
+    };
+
+    const PHASE_PREFIXES: Array<[string, AutoBePhase]> = [
+      ["analyze", "analyze"],
+      ["database", "database"],
+      ["interface", "interface"],
+      ["test", "test"],
+      ["realize", "realize"],
+    ];
+
+    const CONVERSATION_TYPES: Set<string> = new Set([
+      "userMessage",
+      "assistantMessage",
+    ]);
+
+    let currentPhase: AutoBePhase | null = null;
+    for (const s of snapshots) {
+      const type = s.event.type;
+      if (CONVERSATION_TYPES.has(type)) continue;
+      for (const [prefix, phase] of PHASE_PREFIXES) {
+        if (type.startsWith(prefix)) {
+          currentPhase = phase;
+          break;
+        }
+      }
+      if (currentPhase !== null) {
+        phaseMap[currentPhase].push(s);
+      }
+    }
+
+    return {
+      vendor: session.vendor.name,
+      project: session.model,
+      histories,
+      analyze: phaseMap.analyze.length > 0 ? phaseMap.analyze : null,
+      database: phaseMap.database.length > 0 ? phaseMap.database : null,
+      interface: phaseMap.interface.length > 0 ? phaseMap.interface : null,
+      test: phaseMap.test.length > 0 ? phaseMap.test : null,
+      realize: phaseMap.realize.length > 0 ? phaseMap.realize : null,
+    };
+  };
+
+  /**
+   * Build an {@link IAutoBePlaygroundReplay} from example storage.
+   *
+   * The model field of mock sessions encodes both vendor slug and project as
+   * `"vendor/model#project"` (e.g. `"openai/gpt-4.1#bbs"`).
+   *
+   * @internal
+   */
+  const buildReplayFromExamples = async (
+    session: IAutoBePlaygroundSession.ISummary,
+  ): Promise<IAutoBePlaygroundReplay> => {
+    const separatorIndex = session.model.lastIndexOf("#");
+    const vendor: string =
+      separatorIndex >= 0
+        ? session.model.slice(0, separatorIndex)
+        : session.model;
+    const project = (
+      separatorIndex >= 0 ? session.model.slice(separatorIndex + 1) : ""
+    ) as AutoBeExampleProject;
+
+    const safeGetSnapshots = async (
+      phase: AutoBePhase,
+    ): Promise<AutoBeEventSnapshot[] | null> => {
+      const exists = await AutoBeExampleStorage.has({
+        vendor,
+        project,
+        phase,
+      });
+      if (!exists) return null;
+      return AutoBeExampleStorage.getSnapshots({ vendor, project, phase });
+    };
+
+    const PHASES: AutoBePhase[] = [
+      "realize",
+      "test",
+      "interface",
+      "database",
+      "analyze",
+    ];
+    let historiesPhase: AutoBePhase | null = null;
+    for (const phase of PHASES) {
+      const exists = await AutoBeExampleStorage.has({
+        vendor,
+        project,
+        phase,
+      });
+      if (exists) {
+        historiesPhase = phase;
+        break;
+      }
+    }
+
+    return {
+      vendor,
+      project,
+      histories:
+        historiesPhase !== null
+          ? await AutoBeExampleStorage.getHistories({
+              vendor,
+              project,
+              phase: historiesPhase,
+            })
+          : [],
+      analyze: await safeGetSnapshots("analyze"),
+      database: await safeGetSnapshots("database"),
+      interface: await safeGetSnapshots("interface"),
+      test: await safeGetSnapshots("test"),
+      realize: await safeGetSnapshots("realize"),
+    };
   };
 }

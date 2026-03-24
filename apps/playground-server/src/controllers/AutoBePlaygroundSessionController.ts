@@ -46,9 +46,8 @@ export class AutoBePlaygroundSessionController {
   /**
    * Create a new vibe coding session.
    *
-   * Initializes a session bound to the specified vendor configuration. An
-   * aggregate record for tracking phase progress and token usage is
-   * automatically created alongside the session.
+   * Creates a session bound to a stored vendor configuration. The vendor's
+   * decrypted API key will be used when establishing the AI agent connection.
    *
    * @author Samchon
    * @param body Session creation properties

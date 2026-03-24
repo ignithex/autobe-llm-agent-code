@@ -97,8 +97,8 @@ export namespace IAutoBePlaygroundSession {
   /**
    * Properties for creating a new vibe coding session.
    *
-   * References a stored vendor configuration by ID. The vendor's decrypted API
-   * key will be used when establishing the AI agent connection.
+   * Creates a session bound to a stored vendor configuration. The vendor's
+   * decrypted API key will be used when establishing the AI agent connection.
    */
   export interface ICreate {
     /** ID of the stored vendor configuration to use. */
@@ -112,14 +112,48 @@ export namespace IAutoBePlaygroundSession {
      */
     model: string;
 
-    /** Locale for AI assistant responses. */
-    locale: string;
+    /**
+     * Locale for AI assistant responses.
+     *
+     * When omitted, falls back to the global playground configuration.
+     */
+    locale?: string | null;
 
-    /** IANA timezone identifier. */
-    timezone: string;
+    /**
+     * IANA timezone identifier.
+     *
+     * When omitted, falls back to the global playground configuration.
+     */
+    timezone?: string | null;
 
     /** Optional title for this session. */
     title?: string | null;
+
+    /**
+     * Mock session configuration from pre-recorded example data.
+     *
+     * Used exclusively by the server to create test sessions backed by
+     * {@link AutoBeMockAgent}. Not exposed through any public API endpoint.
+     *
+     * @internal
+     */
+    mock?: IMock | undefined;
+  }
+
+  /**
+   * Mock session descriptor.
+   *
+   * @internal
+   */
+  export interface IMock {
+    /** Example vendor/model slug (e.g. `"openai/gpt-4.1"`). */
+    vendor: string;
+
+    /** Example project name (e.g. `"bbs"`, `"todo"`). */
+    project: string;
+
+    /** Artificial delay in milliseconds to simulate between events. */
+    delay?: number | undefined;
   }
 
   /** Properties for updating an existing session. */

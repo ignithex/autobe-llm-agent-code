@@ -7,14 +7,14 @@
 import type { IAutoBePlaygroundVendorModel } from "@autobe/interface";
 import type { IConnection } from "@nestia/fetcher";
 import { PlainFetcher } from "@nestia/fetcher";
-import type { Primitive, tags } from "typia";
+import type { tags } from "typia";
 
 /**
  * List models registered under a vendor.
  *
- * Returns all model entries for the specified vendor, sorted by creation
- * date in descending order. Model entries are automatically created when
- * a session is created with a new model for this vendor.
+ * Returns all model entries for the specified vendor, sorted by creation date
+ * in descending order. Model entries are automatically created when a session
+ * is created with a new model for this vendor.
  *
  * @param vendorId Target vendor's {@link IAutoBePlaygroundVendor.id }
  * @author Samchon
@@ -37,7 +37,7 @@ export async function index(
   });
 }
 export namespace index {
-  export type Output = Primitive<Array<IAutoBePlaygroundVendorModel>>;
+  export type Output = Array<IAutoBePlaygroundVendorModel>;
 
   export const METADATA = {
     method: "GET",
@@ -57,8 +57,8 @@ export namespace index {
 /**
  * Remove a model from a vendor's model list.
  *
- * Permanently deletes the model entry. Sessions that used this model
- * are not affected.
+ * Permanently deletes the model entry. Sessions that used this model are not
+ * affected.
  *
  * @param vendorId Target vendor's {@link IAutoBePlaygroundVendor.id }
  * @param id Target model entry's {@link IAutoBePlaygroundVendorModel.id }
