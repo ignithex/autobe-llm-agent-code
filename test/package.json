@@ -1,7 +1,7 @@
 {
   "private": true,
   "name": "@autobe/test",
-  "version": "0.30.3",
+  "version": "0.30.4-dev.20260324",
   "description": "AutoBE Test Program",
   "main": "src/index.ts",
   "scripts": {
