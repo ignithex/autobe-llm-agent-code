@@ -17,12 +17,16 @@ const meta: MetaRecord = {
     type: "separator",
     title: "🔗 Appendix",
   },
-  ecosystem: "🌐 No-Code Ecosystem",
-  roadmap: "📅 Roadmap",
-  hackathon: "🏆 Hackathon",
   api: {
     title: "🔧 API Documents",
     href: "/api",
   },
+  ecosystem: "🌐 No-Code Ecosystem",
+  roadmap: "📅 Roadmap",
+  hackathon: {
+    title: "🏆 Hackathon",
+    display: "hidden",
+  },
+  seminars: "🎤 Seminars",
 };
 export default meta;

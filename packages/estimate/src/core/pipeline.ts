@@ -220,6 +220,30 @@ export class EvaluationPipeline {
       );
     }
 
+    // Check for incomplete pipeline output (e.g., only prisma files, no NestJS code)
+    if (
+      context.files.controllers.length === 0 &&
+      context.files.providers.length === 0
+    ) {
+      return this.createGateFailure(
+        [
+          createIssue({
+            code: "GATE002",
+            severity: "critical",
+            category: "syntax",
+            message:
+              "No controllers or providers found — pipeline output is incomplete (only infrastructure files exist)",
+          }),
+        ],
+        "no-nestjs-artifacts",
+        startTime,
+        {
+          reason: "No controllers or providers found",
+          typescriptFiles: context.files.typescript.length,
+        },
+      );
+    }
+
     // Syntax check
     this.log("  - Checking syntax...");
     const syntaxResult = await new SyntaxEvaluator().evaluate(context);
@@ -243,37 +267,20 @@ export class EvaluationPipeline {
       errorRatio * 100 * GATE_PENALTY_PER_PERCENT,
     );
 
-    // Gate fail if too many syntax warnings (e.g., unresolved modules)
-    const syntaxWarningCount = syntaxResult.issues.filter(
-      (i) => i.severity === "warning",
-    ).length;
-    if (syntaxWarningCount > 100 || syntaxWarningCount / totalFiles > 0.3) {
-      return this.createGateFailure(issues, "syntax-warnings", startTime, {
-        totalFiles,
-        filesWithErrors,
-        syntaxWarningCount,
-        reason: `Too many syntax warnings: ${syntaxWarningCount} warnings across ${totalFiles} files`,
-      });
-    }
-
     // Type check
     this.log("  - Checking types...");
     const typeResult = await new TypeEvaluator().evaluate(context);
     issues.push(...typeResult.issues);
 
-    const typeIssueCount = typeResult.issues.filter(
-      (i) => i.severity === "critical" || i.severity === "warning",
+    const typeCriticalCount = typeResult.issues.filter(
+      (i) => i.severity === "critical",
     ).length;
-    const typeWarningCount = typeResult.issues.filter(
-      (i) => i.severity === "warning",
-    ).length;
-    if (typeIssueCount > 100 || typeWarningCount / totalFiles > 0.3) {
+    if (typeCriticalCount > 0 && typeCriticalCount / totalFiles > 0.3) {
       return this.createGateFailure(issues, "type-errors", startTime, {
         totalFiles,
         filesWithErrors,
-        typeErrorCount: typeIssueCount,
-        typeWarningCount,
-        reason: `Too many type errors: ${typeIssueCount} critical/warning (${typeWarningCount} warnings across ${totalFiles} files)`,
+        typeCriticalCount,
+        reason: `Too many critical type errors: ${typeCriticalCount} across ${totalFiles} files`,
       });
     }
 
@@ -300,6 +307,19 @@ export class EvaluationPipeline {
     }
 
     // Final gate score combines syntax + type penalties
+    // Exclude infrastructure warnings (SDK version mismatches, not model code issues)
+    const INFRA_PATTERNS = [
+      "NestiaSimulator",
+      "PlainFetcher",
+      "MyGlobal",
+      "unsupported extension",
+    ];
+    const isInfraWarning = (i: Issue) =>
+      i.severity === "warning" &&
+      INFRA_PATTERNS.some((p) => i.message.includes(p));
+    const typeWarningCount = typeResult.issues.filter(
+      (i) => i.severity === "warning" && !isInfraWarning(i),
+    ).length;
     const typePenalty = Math.min(
       10,
       Math.round((typeWarningCount / totalFiles) * 10),
@@ -320,7 +340,7 @@ export class EvaluationPipeline {
         filesWithErrors,
         errorRatio: Math.round(errorRatio * 100),
         penalty: totalPenalty,
-        typeErrorCount: typeIssueCount,
+        typeCriticalCount,
         typeWarningCount,
         softPass: filesWithErrors > 0 || typeWarningCount > 0,
       },
@@ -510,8 +530,18 @@ export class EvaluationPipeline {
       const penaltyData: NonNullable<EvaluationResult["penalties"]> = {};
 
       // Warning penalty: starts at 30%, max -20
+      // Exclude infrastructure warnings (SDK mismatches) from penalty calculation
+      const INFRA_WARNING_PATTERNS = [
+        "NestiaSimulator",
+        "PlainFetcher",
+        "MyGlobal",
+        "unsupported extension",
+      ];
+      const realWarnings = warnings.filter(
+        (w) => !INFRA_WARNING_PATTERNS.some((p) => w.message.includes(p)),
+      );
       const totalFiles = context.files.typescript.length || 1;
-      const warningRatio = warnings.length / totalFiles;
+      const warningRatio = realWarnings.length / totalFiles;
       if (warningRatio > 0.3) {
         const warningPenalty = Math.min(
           20,
@@ -524,7 +554,7 @@ export class EvaluationPipeline {
         };
         if (this.verbose) {
           console.log(
-            `  Warning penalty: -${warningPenalty} (${warnings.length} warnings / ${totalFiles} files = ${penaltyData.warning.ratio})`,
+            `  Warning penalty: -${warningPenalty} (${realWarnings.length} warnings / ${totalFiles} files = ${penaltyData.warning.ratio})`,
           );
         }
       }
