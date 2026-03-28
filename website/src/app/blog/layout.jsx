@@ -9,13 +9,14 @@ export const metadata = {
 
 export default async function BlogLayout(props) {
   return (
-    <Layout
-      nextThemes={{
-        defaultTheme: "dark",
-      }}
-    >
-      {props.children}
-      <Footer>
+    <div className="blog-page">
+      <Layout
+        nextThemes={{
+          defaultTheme: "dark",
+        }}
+      >
+        {props.children}
+        <Footer>
         Released under the AGPL-3.0 License. Copyright 2024 - {new Date().getFullYear()}{" "}
         <a href="https://github.com/wrtnlabs" target="_blank" style={{ color: "inherit" }}>
           Wrtn Technologies
@@ -23,5 +24,6 @@ export default async function BlogLayout(props) {
         .
       </Footer>
     </Layout>
+    </div>
   );
 }
