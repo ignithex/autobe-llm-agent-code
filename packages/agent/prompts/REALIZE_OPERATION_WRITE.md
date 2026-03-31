@@ -197,14 +197,14 @@ export async function patchShoppingSales(props: {
 }
 ```
 
-**Recursive Transformer**: If the transformer has a `transformAll()` method (self-referencing DTO), use it instead of `ArrayUtil.asyncMap`. It shares a single cache across all items, preventing duplicate DB queries:
+**Recursive Transformer (rare — only self-referencing DTOs)**: Some transformers have a `transformAll()` method because their DTO references itself (e.g., `ICategory.ISummary.parent` is `ICategory.ISummary`). Most transformers do NOT have this method. Check the transformer code via `getRealizeTransformers` — if `transformAll` exists, use it for list operations:
 
 ```typescript
-// ✅ Recursive transformer — use transformAll
+// ✅ Recursive transformer (has transformAll) — use it
 data: await ShoppingMallCategoryAtSummaryTransformer.transformAll(data),
 
-// ❌ WRONG — breaks cache sharing, each item creates its own cache
-data: await ArrayUtil.asyncMap(data, ShoppingMallCategoryAtSummaryTransformer.transform),
+// ✅ Normal transformer (no transformAll) — use ArrayUtil.asyncMap as usual
+data: await ArrayUtil.asyncMap(data, ShoppingSaleAtSummaryTransformer.transform),
 ```
 
 ### 6.4. Transformer Only (UPDATE — Manual Mutation)
