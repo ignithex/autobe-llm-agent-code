@@ -346,50 +346,54 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
     this.completed.value = false satisfies boolean as boolean;
     this.previousWrites = [];
 
-    for (let i: number = 0; i < AutoBeConfigConstant.RAG_LIMIT; ++i) {
-      const result: IAutoBeOrchestrateResult<T> = await process(
-        (x) => (value) => ({
-          ...x,
-          value,
-        }),
-      );
-      if (result.value !== null) {
-        const executes: AgenticaExecuteHistory[] = result.histories.filter(
-          (h) => h.type === "execute",
+    try {
+      for (let i: number = 0; i < AutoBeConfigConstant.RAG_LIMIT; ++i) {
+        const result: IAutoBeOrchestrateResult<T> = await process(
+          (x) => (value) => ({
+            ...x,
+            value,
+          }),
         );
-        const history: AgenticaExecuteHistory | undefined = executes.find(
-          (h) => (h.arguments.request as any).type === "write",
-        );
-        if (history === undefined)
-          throw new Error("No write execute found in histories.");
+        if (result.value !== null) {
+          const executes: AgenticaExecuteHistory[] = result.histories.filter(
+            (h) => h.type === "execute",
+          );
+          const history: AgenticaExecuteHistory | undefined = executes.find(
+            (h) => (h.arguments.request as any).type === "write",
+          );
+          if (history === undefined)
+            throw new Error("No write execute found in histories.");
 
-        // clear completion
-        this.completed.value = false;
+          // clear completion
+          this.completed.value = false;
 
-        // store write result and raw arguments
-        const raw: any = history.arguments.request;
-        this.previousWrites.push({
-          value: result.value,
-          raw,
+          // store write result and raw arguments
+          const raw: any = history.arguments.request;
+          this.previousWrites.push({
+            value: result.value,
+            raw,
+          });
+          if (
+            this.previousWrites.length >=
+            AutoBeConfigConstant.PRELIMINARY_WRITE_LIMIT
+          )
+            break;
+        }
+
+        // orchestrate next iteration
+        await orchestratePreliminary(ctx, {
+          source_id: this.source_id,
+          source: this.source,
+          preliminary: this,
+          trial: i + 1,
+          histories: result.histories,
+          completed: this.completed,
         });
-        if (
-          this.previousWrites.length >=
-          AutoBeConfigConstant.PRELIMINARY_WRITE_LIMIT
-        )
+        if (this.completed.value === true && this.previousWrites.length !== 0)
           break;
       }
-
-      // orchestrate next iteration
-      await orchestratePreliminary(ctx, {
-        source_id: this.source_id,
-        source: this.source,
-        preliminary: this,
-        trial: i + 1,
-        histories: result.histories,
-        completed: this.completed,
-      });
-      if (this.completed.value === true && this.previousWrites.length !== 0)
-        break;
+    } catch (error) {
+      if (this.previousWrites.length === 0) throw error;
     }
 
     // console.log("----------------------------------");
