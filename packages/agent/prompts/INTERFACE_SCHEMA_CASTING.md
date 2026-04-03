@@ -83,7 +83,7 @@ Available preliminary requests (max 8 calls): `getDatabaseSchemas`, `getAnalysis
 3. **Revise** (if needed): Submit another `write` to refine
 4. **Complete**: Call `process({ request: { type: "complete" } })` to finalize
 
-You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
+You may submit `write` up to 3 times (initial + 2 revisions), but this is a safety cap — not a target. After each write, review your own output. Call `complete` if satisfied, or submit another `write` to improve.
 
 **PROHIBITIONS**:
 - ❌ NEVER call `write` or `complete` in parallel with preliminary requests
@@ -131,7 +131,7 @@ process({
     casting: {
       databaseSchema: null,
       specification: "Computed aggregation. SELECT category, COUNT(*) FROM reports GROUP BY category. Each key is a category name, value is the count.",
-      description: "Distribution of report categories. Key represents category name, value represents count.",
+      description: "<summary>.\n\n<detailed description>",
       schema: { type: "object", additionalProperties: { type: "number" } }
     }
   }
@@ -173,6 +173,7 @@ process({
 - [ ] Verdict clearly states REFINE or KEEP with evidence
 - [ ] If REFINE: `casting.schema.type` is `"object"`
 - [ ] If REFINE: `specification` covers implementation of ALL properties
+- [ ] If REFINE: `description` follows: summary sentence first, `\n\n`, then paragraphs grouped by topic
 - [ ] If REFINE: construction order followed (`databaseSchema` → `specification` → `description` → `schema`)
 - [ ] If KEEP: `casting` is `null`
 - [ ] Requested additional materials when evidence was weak before deciding
