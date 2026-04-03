@@ -4,8 +4,10 @@ import { TestValidator } from "@nestia/e2e";
 import typia, { tags } from "typia";
 
 /**
- * A DTO with a nullable N:1 self-reference (parent property).
- * getRecursiveRelations must detect the parent property and return null for children.
+ * # A DTO with a nullable N:1 self-reference (parent property).
+ *
+ * GetRecursiveRelations must detect the parent property and return null for
+ * children.
  */
 interface ICategory {
   id: string & tags.Format<"uuid">;

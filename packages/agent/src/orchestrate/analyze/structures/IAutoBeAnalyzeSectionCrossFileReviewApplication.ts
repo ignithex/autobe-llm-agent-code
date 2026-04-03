@@ -1,3 +1,4 @@
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
 
 /**
@@ -11,21 +12,26 @@ export interface IAutoBeAnalyzeSectionCrossFileReviewApplication {
 
 export interface IAutoBeAnalyzeSectionCrossFileReviewApplicationProps {
   /**
-   * Reasoning about your current state: what's missing (preliminary) or what
-   * you accomplished (completion).
+   * Reasoning: what's missing (preliminary), what you're submitting (write), or
+   * why you're finalizing (complete).
    */
   thinking?: string | null;
 
-  /** Action to perform. Exhausted preliminary types are removed from the union. */
+  /**
+   * Action to perform. Write can be called up to 3 times; after the 3rd write,
+   * completion is forced. Exhausted preliminary types are removed from the
+   * union.
+   */
   request:
-    | IAutoBeAnalyzeSectionCrossFileReviewApplicationComplete
+    | IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite
+    | IAutoBePreliminaryComplete
     | IAutoBePreliminaryGetPreviousAnalysisSections;
 }
 
-/** Complete the cross-file section consistency review with per-file verdicts. */
-export interface IAutoBeAnalyzeSectionCrossFileReviewApplicationComplete {
-  /** Type discriminator for completion request. */
-  type: "complete";
+/** Submit the cross-file section consistency review with per-file verdicts. */
+export interface IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite {
+  /** Type discriminator for write submission. */
+  type: "write";
 
   /** Per-file review results. */
   fileResults: IAutoBeAnalyzeSectionCrossFileReviewApplicationFileResult[];

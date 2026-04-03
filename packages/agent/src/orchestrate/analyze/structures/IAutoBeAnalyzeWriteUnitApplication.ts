@@ -1,3 +1,4 @@
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
 
 /** Generates unit-level sections (##) within approved module structures. */
@@ -11,21 +12,22 @@ export interface IAutoBeAnalyzeWriteUnitApplication {
 
 export interface IAutoBeAnalyzeWriteUnitApplicationProps {
   /**
-   * Reasoning about your current state: what's missing (preliminary) or what
-   * you accomplished (completion).
+   * Reasoning: what's missing (preliminary), what you're submitting (write), or
+   * why you're finalizing (complete).
    */
   thinking?: string | null;
 
   /** Action to perform. Exhausted preliminary types are removed from the union. */
   request:
-    | IAutoBeAnalyzeWriteUnitApplicationComplete
+    | IAutoBeAnalyzeWriteUnitApplicationWrite
+    | IAutoBePreliminaryComplete
     | IAutoBePreliminaryGetPreviousAnalysisSections;
 }
 
-/** Generate unit section structure within a module section. */
-export interface IAutoBeAnalyzeWriteUnitApplicationComplete {
-  /** Type discriminator for completion request. */
-  type: "complete";
+/** Submit unit section structure within a module section. */
+export interface IAutoBeAnalyzeWriteUnitApplicationWrite {
+  /** Type discriminator for write submission. */
+  type: "write";
 
   /** Index of the parent module section (0-based). */
   moduleIndex: number;

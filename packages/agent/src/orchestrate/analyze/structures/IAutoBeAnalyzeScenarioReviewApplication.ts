@@ -11,20 +11,17 @@ export interface IAutoBeAnalyzeScenarioReviewApplication {
 }
 
 export interface IAutoBeAnalyzeScenarioReviewApplicationProps {
-  /**
-   * Reasoning about your current state: what's missing (preliminary) or what
-   * you accomplished (completion).
-   */
+  /** Reasoning about the review verdict and key findings. */
   thinking?: string | null;
 
   /** Action to perform: submit review verdict. */
   request: IAutoBeAnalyzeScenarioReviewApplicationComplete;
 }
 
-/** Request to complete the scenario review. */
+/** Submit scenario review verdict for validation. */
 export interface IAutoBeAnalyzeScenarioReviewApplicationComplete {
-  /** Type discriminator for completion request. */
-  type: "complete";
+  /** Type discriminator for write submission. */
+  type: "write";
 
   /** Whether the scenario passed review. */
   approved: boolean;

@@ -16,6 +16,8 @@ You must provide a revision for **EVERY** endpoint in the provided list. No omis
 - `erase`: Endpoint should not exist
 - `create`: Missing endpoint should be added → provide `design`
 
+You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
+
 ## 3. Common Mistakes to Fix
 
 ### 3.1. Redundant Actor Prefix in Path
@@ -143,11 +145,12 @@ FIX:
 ## 4. Output Format
 
 ```typescript
+// Step 1: Submit review results (can repeat to revise)
 process({
   thinking: "Brief analysis of what was found.",
   review: "Summary of findings.",
   request: {
-    type: "complete",
+    type: "write",
     revises: [
       { type: "keep", reason: "Justified and correct.", endpoint: { path: "/analytics/sales", method: "patch" } },
       { type: "update", reason: "...", endpoint: { path: "...", method: "..." }, newDesign: { ... } },
@@ -156,8 +159,18 @@ process({
     ],
   }
 })
+
+// Step 2: Finalize (after at least one write)
+process({
+  thinking: "Last write is correct. All endpoints reviewed.",
+  request: { type: "complete" }
+})
 ```
+
+**PROHIBITIONS**:
+- ❌ NEVER call `write` or `complete` in parallel with preliminary requests
+- ❌ NEVER call `complete` before submitting at least one `write`
 
 ---
 
-**YOUR MISSION**: Review all endpoints. Provide a revision (keep/update/erase) for EVERY endpoint. Refer to INTERFACE_ACTION_ENDPOINT_WRITE.md for all design rules.
+**YOUR MISSION**: Review all endpoints. Provide a revision (keep/update/erase) for EVERY endpoint. Call `process({ request: { type: "write", ... } })` then `process({ request: { type: "complete" } })`. Refer to INTERFACE_ACTION_ENDPOINT_WRITE.md for all design rules.

@@ -1,5 +1,6 @@
 import { AutoBeInterfaceEndpointRevise } from "@autobe/interface";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetDatabaseSchemas } from "../../common/structures/IAutoBePreliminaryGetDatabaseSchemas";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
@@ -17,8 +18,8 @@ export interface IAutoBeInterfaceEndpointReviewApplication {
 export namespace IAutoBeInterfaceEndpointReviewApplication {
   export interface IProps {
     /**
-     * Reasoning about your current state: what's missing (preliminary) or what
-     * you accomplished (completion).
+     * Reasoning: what's missing (preliminary), what you're submitting (write),
+     * or why you're finalizing (complete).
      */
     thinking: string;
 
@@ -27,7 +28,8 @@ export namespace IAutoBeInterfaceEndpointReviewApplication {
      * union.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetDatabaseSchemas
       | IAutoBePreliminaryGetPreviousAnalysisSections
@@ -36,12 +38,12 @@ export namespace IAutoBeInterfaceEndpointReviewApplication {
   }
 
   /**
-   * Complete endpoint review with revision decisions (keep/create/update/erase)
-   * for ALL endpoints.
+   * Submit endpoint review with revision decisions (keep/create/update/erase)
+   * for ALL endpoints for validation.
    */
-  export interface IComplete {
-    /** Type discriminator for completion request. */
-    type: "complete";
+  export interface IWrite {
+    /** Type discriminator for write submission. */
+    type: "write";
 
     /**
      * Summary of issues found and fixes applied. State "No issues found." if
@@ -57,3 +59,7 @@ export namespace IAutoBeInterfaceEndpointReviewApplication {
     revises: AutoBeInterfaceEndpointRevise[];
   }
 }
+
+/** @deprecated Use IAutoBeInterfaceEndpointReviewApplication.IWrite instead. */
+export type IAutoBeInterfaceEndpointReviewApplicationComplete =
+  IAutoBeInterfaceEndpointReviewApplication.IWrite;

@@ -1,5 +1,6 @@
 import { AutoBeDatabaseComponentTableRevise } from "@autobe/interface";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
 import { IAutoBePreliminaryGetPreviousDatabaseSchemas } from "../../common/structures/IAutoBePreliminaryGetPreviousDatabaseSchemas";
@@ -12,8 +13,8 @@ export interface IAutoBeDatabaseComponentReviewApplication {
 export namespace IAutoBeDatabaseComponentReviewApplication {
   export interface IProps {
     /**
-     * Reasoning about your current state: what's missing (preliminary) or what
-     * you accomplished (completion).
+     * Reasoning: what's missing (preliminary), what you're submitting (write),
+     * or why you're finalizing (complete).
      */
     thinking: string;
 
@@ -22,16 +23,17 @@ export namespace IAutoBeDatabaseComponentReviewApplication {
      * union.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetPreviousAnalysisSections
       | IAutoBePreliminaryGetPreviousDatabaseSchemas;
   }
 
-  /** Submit table revisions after requirements analysis. */
-  export interface IComplete {
-    /** Type discriminator. Value "complete" indicates final submission. */
-    type: "complete";
+  /** Submit table revisions for validation. */
+  export interface IWrite {
+    /** Type discriminator for write submission. */
+    type: "write";
 
     /**
      * How requirements map to proposed table modifications, identifying
@@ -56,3 +58,7 @@ export namespace IAutoBeDatabaseComponentReviewApplication {
     revises: AutoBeDatabaseComponentTableRevise[];
   }
 }
+
+/** @deprecated Use IAutoBeDatabaseComponentReviewApplication.IWrite instead. */
+export type IAutoBeDatabaseComponentReviewApplicationComplete =
+  IAutoBeDatabaseComponentReviewApplication.IWrite;

@@ -18,8 +18,8 @@ import { AutoBePreliminaryController } from "../common/AutoBePreliminaryControll
 import { transformAnalyzeSectionCrossFileReviewHistory } from "./histories/transformAnalyzeSectionCrossFileReviewHistory";
 import {
   IAutoBeAnalyzeSectionCrossFileReviewApplication,
-  IAutoBeAnalyzeSectionCrossFileReviewApplicationComplete,
   IAutoBeAnalyzeSectionCrossFileReviewApplicationProps,
+  IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite,
 } from "./structures/IAutoBeAnalyzeSectionCrossFileReviewApplication";
 import { repairSectionReviewInput } from "./utils/repairSectionReviewUtils";
 
@@ -62,7 +62,7 @@ export const orchestrateAnalyzeSectionCrossFileReview = async (
       state: ctx.state(),
     });
   return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeAnalyzeSectionCrossFileReviewApplicationComplete | null> =
+    const pointer: IPointer<IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite | null> =
       {
         value: null,
       };
@@ -107,7 +107,7 @@ export const orchestrateAnalyzeSectionCrossFileReview = async (
 };
 
 function createController(props: {
-  pointer: IPointer<IAutoBeAnalyzeSectionCrossFileReviewApplicationComplete | null>;
+  pointer: IPointer<IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite | null>;
   preliminary: AutoBePreliminaryController<"previousAnalysisSections">;
 }): IAgenticaController.IClass {
   const validate = (
@@ -118,7 +118,7 @@ function createController(props: {
       typia.validate<IAutoBeAnalyzeSectionCrossFileReviewApplicationProps>(
         input,
       );
-    if (result.success === false || result.data.request.type === "complete")
+    if (result.success === false || result.data.request.type === "write")
       return result;
     return props.preliminary.validate({
       thinking: result.data.thinking ?? "",
@@ -138,8 +138,7 @@ function createController(props: {
     application,
     execute: {
       process: (input) => {
-        if (input.request.type === "complete")
-          props.pointer.value = input.request;
+        if (input.request.type === "write") props.pointer.value = input.request;
       },
     } satisfies IAutoBeAnalyzeSectionCrossFileReviewApplication,
   };

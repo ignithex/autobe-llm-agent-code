@@ -324,14 +324,15 @@ process({
 })
 ```
 
-### 6.2. Complete (MANDATORY)
+### 6.2. Write (MANDATORY)
 ```typescript
+// Step 1: Submit model design (can repeat to revise)
 process({
   thinking: "Designed target table with proper normalization and stance.",
   request: {
-    type: "complete",
+    type: "write",
     plan: "Strategic analysis for [targetTable]...",
-    model: {
+    definition: {
       name: "target_table",
       stance: "primary",
       description: "...",
@@ -344,7 +345,19 @@ process({
     }
   }
 })
+
+// Step 2: Finalize
+process({
+  thinking: "Table designed with proper normalization. Submitted target_table with stance primary, 3NF compliant, proper FKs and indexes.",
+  request: { type: "complete" }
+})
 ```
+
+You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
+
+**PROHIBITIONS**:
+- ❌ NEVER call `write` or `complete` in parallel with preliminary requests
+- ❌ NEVER call `complete` before submitting at least one `write`
 
 ---
 
@@ -417,4 +430,5 @@ FINAL DESIGN:
 
 **Execution:**
 - [ ] `thinking` field completed
-- [ ] Ready to call `process()` with `type: "complete"`
+- [ ] Submit model via `write` (can call multiple times to refine)
+- [ ] Finalize via `complete` after last `write`

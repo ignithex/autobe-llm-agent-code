@@ -55,9 +55,27 @@ export const transformPreliminaryHistory = <Kind extends AutoBePreliminaryKind>(
       });
     })
     .flat();
+
+  // sequence messages
   const systems = histories.filter((h) => h.type === "systemMessage");
   const others = histories.filter((h) => h.type !== "systemMessage");
-  return [...systems, ...others];
+  const messages = [...systems, ...others];
+
+  // previous written value
+  const previousWrite: Record<string, any> | null =
+    preliminary.getPreviousWrite();
+  if (previousWrite !== null)
+    messages.push(
+      createFunctionCallingMessage({
+        controller: preliminary.getSource(),
+        kind: "write" as any,
+        arguments: {
+          thinking: "previous written value waiting for confirmation",
+          previousWrite,
+        },
+      }),
+    );
+  return messages;
 };
 
 namespace PreliminaryTransformer {
@@ -705,8 +723,8 @@ const createFunctionCallingMessage = <
   Kind extends AutoBePreliminaryKind,
 >(props: {
   controller: Exclude<AutoBeEventSource, "facade" | "preliminary">;
-  kind: Kind;
-  arguments: IAutoBePreliminaryRequest<Kind>;
+  kind: Kind | "write";
+  arguments: Record<string, any>;
 }): IAgenticaHistoryJson.IAssistantMessage | IAgenticaHistoryJson.IExecute => ({
   type: "execute",
   id: v7(),
@@ -716,8 +734,7 @@ const createFunctionCallingMessage = <
     function: "process",
     name: "process",
   },
-  // biome-ignore lint: intended
-  arguments: props.arguments as Record<string, any>,
+  arguments: props.arguments,
   value: undefined,
   success: true,
   created_at: new Date().toISOString(),

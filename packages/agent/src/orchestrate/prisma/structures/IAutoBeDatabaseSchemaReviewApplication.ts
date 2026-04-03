@@ -1,5 +1,6 @@
 import { AutoBeDatabaseSchemaDefinition } from "@autobe/interface";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetDatabaseSchemas } from "../../common/structures/IAutoBePreliminaryGetDatabaseSchemas";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
@@ -12,8 +13,8 @@ export interface IAutoBeDatabaseSchemaReviewApplication {
 export namespace IAutoBeDatabaseSchemaReviewApplication {
   export interface IProps {
     /**
-     * Reasoning about your current state: what's missing (preliminary) or what
-     * you accomplished (completion).
+     * Reasoning: what's missing (preliminary), what you're submitting (write),
+     * or why you're finalizing (complete).
      */
     thinking: string;
 
@@ -22,20 +23,18 @@ export namespace IAutoBeDatabaseSchemaReviewApplication {
      * union.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetDatabaseSchemas
       | IAutoBePreliminaryGetPreviousAnalysisSections
       | IAutoBePreliminaryGetPreviousDatabaseSchemas;
   }
 
-  /**
-   * Review and refine database schema models for normalization, relationships,
-   * and performance.
-   */
-  export interface IComplete {
-    /** Type discriminator for completion request. */
-    type: "complete";
+  /** Submit database schema review for validation. */
+  export interface IWrite {
+    /** Type discriminator for write submission. */
+    type: "write";
 
     /**
      * Review analysis covering normalization, relationships, indexes, naming,
@@ -59,3 +58,7 @@ export namespace IAutoBeDatabaseSchemaReviewApplication {
     content: AutoBeDatabaseSchemaDefinition | null;
   }
 }
+
+/** @deprecated Use IAutoBeDatabaseSchemaReviewApplication.IWrite instead. */
+export type IAutoBeDatabaseSchemaReviewApplicationComplete =
+  IAutoBeDatabaseSchemaReviewApplication.IWrite;

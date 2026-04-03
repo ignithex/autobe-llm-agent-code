@@ -1,5 +1,6 @@
 import { AutoBeOpenApi } from "@autobe/interface";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetDatabaseSchemas } from "../../common/structures/IAutoBePreliminaryGetDatabaseSchemas";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
@@ -10,8 +11,8 @@ export interface IAutoBeInterfaceOperationReviewApplication {
   /**
    * Process operation review task or preliminary data requests.
    *
-   * @param props Request containing either preliminary data request or complete
-   *   task
+   * @param props Preliminary data request, write submission, or completion
+   *   confirmation
    */
   process(props: IAutoBeInterfaceOperationReviewApplication.IProps): void;
 }
@@ -22,10 +23,11 @@ export namespace IAutoBeInterfaceOperationReviewApplication {
      * Think before you act.
      *
      * For preliminary requests: what critical information is missing and why?
-     * Be brief — state the gap, don't list everything you have.
      *
-     * For completion: what key assets did you acquire, what did you accomplish,
-     * why is it sufficient? Summarize — don't enumerate every single item.
+     * For write: what review findings you're submitting and corrections
+     * applied.
+     *
+     * For complete: why you consider the last write final.
      */
     thinking: string;
 
@@ -34,7 +36,8 @@ export namespace IAutoBeInterfaceOperationReviewApplication {
      * union, physically preventing repeated calls.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetDatabaseSchemas
       | IAutoBePreliminaryGetPreviousAnalysisSections
@@ -43,7 +46,8 @@ export namespace IAutoBeInterfaceOperationReviewApplication {
   }
 
   /**
-   * Review and validate an API operation. Can ONLY modify IOperation fields:
+   * Submit API operation review for validation. Can ONLY modify IOperation
+   * fields:
    *
    * - `specification`: Can fix implementation details, algorithm descriptions,
    *   database query logic
@@ -55,9 +59,9 @@ export namespace IAutoBeInterfaceOperationReviewApplication {
    * Return null to reject if issues exist in non-modifiable fields (path,
    * method, parameters, etc.).
    */
-  export interface IComplete {
-    /** Type discriminator for completion request. */
-    type: "complete";
+  export interface IWrite {
+    /** Type discriminator for write submission. */
+    type: "write";
 
     /** Operation-level review findings organized by severity. */
     review: string;
@@ -85,3 +89,7 @@ export namespace IAutoBeInterfaceOperationReviewApplication {
     "specification" | "description" | "requestBody" | "responseBody"
   > {}
 }
+
+/** @deprecated Use IAutoBeInterfaceOperationReviewApplication.IWrite instead. */
+export type IAutoBeInterfaceOperationReviewApplicationComplete =
+  IAutoBeInterfaceOperationReviewApplication.IWrite;

@@ -122,12 +122,13 @@ process({
 })
 ```
 
-### 4.3. Complete
+### 4.3. Write and Complete
 ```typescript
+// Step 1: Submit group design
 process({
   thinking: "Created complete component structure covering all business domains.",
   request: {
-    type: "complete",
+    type: "write",
     analysis: "Identified 8 business domains from requirements...",
     rationale: "Each component handles 3-12 tables with clear boundaries...",
     groups: [
@@ -151,7 +152,19 @@ process({
     ]
   }
 })
+
+// Step 2: Finalize
+process({
+  thinking: "Last write is correct. All business domains covered.",
+  request: { type: "complete" }
+})
 ```
+
+You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
+
+**PROHIBITIONS**:
+- ❌ NEVER call `write` or `complete` in parallel with preliminary requests
+- ❌ NEVER call `complete` before submitting at least one `write`
 
 ---
 
@@ -185,11 +198,17 @@ process({ request: { type: "complete", ... } })  // WRONG!
 
 ## 6. Output Format
 ```typescript
-interface IComplete {
-  type: "complete";
+// Step 1: Submit group design (can repeat to revise)
+interface IWrite {
+  type: "write";
   analysis: string;   // Domain identification and organization analysis
   rationale: string;  // Grouping decisions explanation
   groups: AutoBeDatabaseGroup[];
+}
+
+// Step 2: Confirm finalization (after at least one write)
+interface IAutoBePreliminaryComplete {
+  type: "complete";
 }
 
 interface AutoBeDatabaseGroup {
@@ -231,7 +250,8 @@ interface AutoBeDatabaseGroup {
 - [ ] `thinking` field completed
 - [ ] `analysis` documents domain identification
 - [ ] `rationale` explains grouping decisions
-- [ ] Ready to call `process()` with `type: "complete"`
+- [ ] Submit groups via `write` (can call multiple times to refine)
+- [ ] Finalize via `complete` after last `write`
 
 **When in Doubt:**
 - [ ] Create MORE components rather than FEWER

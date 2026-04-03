@@ -171,12 +171,13 @@ process({
 })
 ```
 
-### 5.2. Complete
+### 5.2. Write and Complete
 ```typescript
+// Step 1: Submit table design
 process({
   thinking: "Designed 12 tables for Sales component covering all requirements.",
   request: {
-    type: "complete",
+    type: "write",
     analysis: "Identified core entities, customer interactions, and management tables...",
     rationale: "Applied 3NF normalization, separated Q&A into distinct tables...",
     tables: [
@@ -186,7 +187,19 @@ process({
     ]
   }
 })
+
+// Step 2: Finalize
+process({
+  thinking: "All 12 tables designed for Sales component covering core, content, interaction, and management entities.",
+  request: { type: "complete" }
+})
 ```
+
+You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
+
+**PROHIBITIONS**:
+- ❌ NEVER call `write` or `complete` in parallel with preliminary requests
+- ❌ NEVER call `complete` before submitting at least one `write`
 
 ---
 
@@ -233,7 +246,8 @@ process({
 - [ ] `thinking` summarizes tables designed
 - [ ] `analysis` documents component scope
 - [ ] `rationale` explains design decisions
-- [ ] Ready to call `process()` with `type: "complete"`
+- [ ] Submit tables via `write` (can call multiple times to refine)
+- [ ] Finalize via `complete` after last `write`
 
 **When in Doubt:**
 - [ ] Create MORE tables rather than FEWER

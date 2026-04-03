@@ -17,8 +17,8 @@ import { AutoBePreliminaryController } from "../common/AutoBePreliminaryControll
 import { transformAnalyzeWriteUnitHistory } from "./histories/transformAnalyzeWriteUnitHistory";
 import {
   IAutoBeAnalyzeWriteUnitApplication,
-  IAutoBeAnalyzeWriteUnitApplicationComplete,
   IAutoBeAnalyzeWriteUnitApplicationProps,
+  IAutoBeAnalyzeWriteUnitApplicationWrite,
 } from "./structures/IAutoBeAnalyzeWriteUnitApplication";
 import {
   isRecord,
@@ -47,10 +47,9 @@ export const orchestrateAnalyzeWriteUnit = async (
       state: ctx.state(),
     });
   return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationComplete | null> =
-      {
-        value: null,
-      };
+    const pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationWrite | null> = {
+      value: null,
+    };
     const result: AutoBeContext.IResult = await ctx.conversate({
       source: SOURCE,
       controller: createController({
@@ -90,7 +89,7 @@ export const orchestrateAnalyzeWriteUnit = async (
 };
 
 function createController(props: {
-  pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationComplete | null>;
+  pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationWrite | null>;
   preliminary: AutoBePreliminaryController<"previousAnalysisSections">;
 }): IAgenticaController.IClass {
   const validate = (
@@ -102,7 +101,7 @@ function createController(props: {
     if (result.success === false) return result;
 
     // Validate English-only content for complete requests
-    if (result.data.request.type === "complete") {
+    if (result.data.request.type === "write") {
       const englishValidation = validateUnitSectionContent(
         result.data.request.unitSections,
       );
@@ -138,8 +137,7 @@ function createController(props: {
     application,
     execute: {
       process: (input) => {
-        if (input.request.type === "complete")
-          props.pointer.value = input.request;
+        if (input.request.type === "write") props.pointer.value = input.request;
       },
     } satisfies IAutoBeAnalyzeWriteUnitApplication,
   };
@@ -165,7 +163,7 @@ const repairFlattenedPayload = (
     Array.isArray(input.unitSections) || Array.isArray(input.sections);
   const completeLike =
     hasUnitSections &&
-    (input.type === "complete" ||
+    (input.type === "write" ||
       input.type === "" ||
       input.type === undefined ||
       input.type === null);
@@ -177,7 +175,7 @@ const repairFlattenedPayload = (
       ...rest,
       ...(thinking !== undefined ? { thinking } : {}),
       request: {
-        type: "complete",
+        type: "write",
         moduleIndex,
         unitSections: unitSections ?? sections,
       },
@@ -205,10 +203,10 @@ const repairRequestType = (
   request: Record<string, unknown>,
 ): Record<string, unknown> => {
   const t = request.type;
-  if (t === "complete" || t === "getPreviousAnalysisSections") return request;
+  if (t === "write" || t === "getPreviousAnalysisSections") return request;
 
   if (Array.isArray(request.unitSections) || Array.isArray(request.sections)) {
-    return { ...request, type: "complete" };
+    return { ...request, type: "write" };
   }
 
   if (Array.isArray(request.sectionIds) && request.sectionIds.length > 0) {
@@ -216,7 +214,7 @@ const repairRequestType = (
   }
 
   if (typeof t === "string" || t === null || t === undefined) {
-    return { ...request, type: "complete" };
+    return { ...request, type: "write" };
   }
 
   return request;

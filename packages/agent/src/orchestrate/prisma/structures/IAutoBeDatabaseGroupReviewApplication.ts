@@ -1,5 +1,6 @@
 import { AutoBeDatabaseGroupRevise } from "@autobe/interface";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
 import { IAutoBePreliminaryGetPreviousDatabaseSchemas } from "../../common/structures/IAutoBePreliminaryGetPreviousDatabaseSchemas";
@@ -12,8 +13,8 @@ export interface IAutoBeDatabaseGroupReviewApplication {
 export namespace IAutoBeDatabaseGroupReviewApplication {
   export interface IProps {
     /**
-     * Reasoning about your current state: what's missing (preliminary) or what
-     * you accomplished (completion).
+     * Reasoning: what's missing (preliminary), what you're submitting (write),
+     * or why you're finalizing (complete).
      */
     thinking: string;
 
@@ -22,16 +23,17 @@ export namespace IAutoBeDatabaseGroupReviewApplication {
      * union.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetPreviousAnalysisSections
       | IAutoBePreliminaryGetPreviousDatabaseSchemas;
   }
 
-  /** Submit group revisions after domain coverage analysis. */
-  export interface IComplete {
-    /** Type discriminator. Value "complete" indicates final submission. */
-    type: "complete";
+  /** Submit group revisions for validation. */
+  export interface IWrite {
+    /** Type discriminator for write submission. */
+    type: "write";
 
     /**
      * How business requirements map to proposed group modifications,
@@ -54,3 +56,7 @@ export namespace IAutoBeDatabaseGroupReviewApplication {
     revises: AutoBeDatabaseGroupRevise[];
   }
 }
+
+/** @deprecated Use IAutoBeDatabaseGroupReviewApplication.IWrite instead. */
+export type IAutoBeDatabaseGroupReviewApplicationComplete =
+  IAutoBeDatabaseGroupReviewApplication.IWrite;

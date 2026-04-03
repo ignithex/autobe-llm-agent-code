@@ -1,5 +1,6 @@
 import { AutoBeTestScenario } from "@autobe/interface";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetInterfaceOperations } from "../../common/structures/IAutoBePreliminaryGetInterfaceOperations";
 import { IAutoBePreliminaryGetInterfaceSchemas } from "../../common/structures/IAutoBePreliminaryGetInterfaceSchemas";
@@ -12,8 +13,8 @@ export interface IAutoBeTestScenarioApplication {
    * retrieving necessary interface operations via RAG (Retrieval-Augmented
    * Generation) and generating detailed test drafts with dependencies.
    *
-   * @param props Request containing either preliminary data request or complete
-   *   task
+   * @param props Preliminary data request, write submission, or completion
+   *   confirmation
    */
   process(props: IAutoBeTestScenarioApplication.IProps): void;
 }
@@ -26,18 +27,11 @@ export namespace IAutoBeTestScenarioApplication {
      * Before requesting preliminary data or completing your task, reflect on
      * your current state and explain your reasoning:
      *
-     * For preliminary requests (getAnalysisSections, getDatabaseSchemas, etc.):
+     * For preliminary requests: what information is missing and why?
      *
-     * - What critical information is missing that you don't already have?
-     * - Why do you need it specifically right now?
-     * - Be brief - state the gap, don't list everything you have.
+     * For write: what scenarios you're submitting and key decisions.
      *
-     * For completion (complete):
-     *
-     * - What key assets did you acquire?
-     * - What did you accomplish?
-     * - Why is it sufficient to complete?
-     * - Summarize - don't enumerate every single item.
+     * For complete: why you consider the last write final.
      *
      * This reflection helps you avoid duplicate requests and premature
      * completion.
@@ -47,35 +41,33 @@ export namespace IAutoBeTestScenarioApplication {
     /**
      * Type discriminator for the request.
      *
-     * Determines which action to perform: preliminary data retrieval
-     * (getAnalysisSections, getInterfaceOperations, getInterfaceSchemas) or
-     * final test scenario generation (complete). When preliminary returns empty
-     * array, that type is removed from the union, physically preventing
-     * repeated calls.
+     * Determines which action to perform: preliminary data retrieval, write
+     * submission, or completion signal. Exhausted preliminary types are removed
+     * from the union, physically preventing repeated calls.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetInterfaceOperations
       | IAutoBePreliminaryGetInterfaceSchemas;
   }
 
   /**
-   * Request to generate test scenarios for API endpoints.
+   * Submit test scenarios for API endpoints for validation.
    *
-   * Executes test scenario generation to create focused, implementable test
-   * scenarios (1-3 per endpoint) covering the most critical business workflows,
-   * primary success paths, and important edge cases.
+   * Submits test scenario data to create focused, implementable test scenarios
+   * (1-3 per endpoint) covering the most critical business workflows, primary
+   * success paths, and important edge cases.
    */
-  export interface IComplete {
+  export interface IWrite {
     /**
      * Type discriminator for the request.
      *
-     * Determines which action to perform: preliminary data retrieval or actual
-     * task execution. Value "complete" indicates this is the final task
-     * execution request.
+     * Value "write" indicates this is a write submission for external
+     * validation.
      */
-    type: "complete";
+    type: "write";
 
     /**
      * Array of generated test scenarios for the target operation.
@@ -103,3 +95,7 @@ export namespace IAutoBeTestScenarioApplication {
     scenarios: AutoBeTestScenario[];
   }
 }
+
+/** @deprecated Use IAutoBeTestScenarioApplication.IWrite instead. */
+export type IAutoBeTestScenarioApplicationComplete =
+  IAutoBeTestScenarioApplication.IWrite;

@@ -8,7 +8,10 @@ You fix **TypeScript compilation errors** in transformer code. Refer to the Tran
 
 1. **Analyze**: Review TypeScript diagnostics and identify error patterns
 2. **Request Context** (if needed): Use `getDatabaseSchemas` for fixing field name errors
-3. **Execute**: Call `process({ request: { type: "complete", think, selectMappings, transformMappings, draft, revise } })` after analysis
+3. **Execute**: Call `process({ request: { type: "write", think, selectMappings, transformMappings, draft, revise } })` after analysis
+4. **Complete**: Call `process({ request: { type: "complete" } })` to finalize
+
+You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
 
 ## 2. Input Information
 
@@ -23,8 +26,8 @@ You receive:
 
 ```typescript
 export namespace IAutoBeRealizeTransformerCorrectApplication {
-  export interface IComplete {
-    type: "complete";
+  export interface IWrite {
+    type: "write";
     think: string;                                        // Error analysis and strategy
     selectMappings: AutoBeRealizeTransformerSelectMapping[];   // Field-by-field verification
     transformMappings: AutoBeRealizeTransformerTransformMapping[]; // Property-by-property verification

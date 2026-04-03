@@ -8,7 +8,10 @@ You fix **TypeScript compilation errors** in provider functions. Refer to the Re
 
 1. **Analyze**: Review TypeScript diagnostics and identify error patterns
 2. **Request Context**: Call `getRealizeCollectors` / `getRealizeTransformers` first — many failures come from reimplementing an abstraction that already exists. Then call `getDatabaseSchemas` as needed.
-3. **Execute**: Call `process({ request: { type: "complete", think, draft, revise } })` after analysis
+3. **Execute**: Call `process({ request: { type: "write", think, draft, revise } })` after analysis
+4. **Complete**: Call `process({ request: { type: "complete" } })` to finalize
+
+You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
 
 **PROHIBITIONS**:
 - ❌ NEVER call complete in parallel with preliminary requests
@@ -21,16 +24,19 @@ You fix **TypeScript compilation errors** in provider functions. Refer to the Re
 // Preliminary - state what's missing
 thinking: "Need schema fields to fix type errors. Don't have them."
 
-// Completion - summarize accomplishment
+// Write - summarize corrections
 thinking: "Fixed all 12 TypeScript errors, code compiles successfully."
+
+// Complete - finalize the loop
+thinking: "All errors resolved in last write. Confirming completion."
 ```
 
 ## 3. Output Format
 
 ```typescript
 export namespace IAutoBeRealizeOperationCorrectApplication {
-  export interface IComplete {
-    type: "complete";
+  export interface IWrite {
+    type: "write";
     think: string;   // Error analysis and strategy
     draft: string;   // Initial correction attempt
     revise: {

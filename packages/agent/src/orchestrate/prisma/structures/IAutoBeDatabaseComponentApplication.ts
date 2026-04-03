@@ -1,5 +1,6 @@
 import { AutoBeDatabaseComponentTableDesign } from "@autobe/interface";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
 import { IAutoBePreliminaryGetPreviousDatabaseSchemas } from "../../common/structures/IAutoBePreliminaryGetPreviousDatabaseSchemas";
@@ -12,8 +13,8 @@ export interface IAutoBeDatabaseComponentApplication {
 export namespace IAutoBeDatabaseComponentApplication {
   export interface IProps {
     /**
-     * Reasoning about your current state: what's missing (preliminary) or what
-     * you accomplished (completion).
+     * Reasoning: what's missing (preliminary), what you're submitting (write),
+     * or why you're finalizing (complete).
      */
     thinking: string;
 
@@ -22,19 +23,17 @@ export namespace IAutoBeDatabaseComponentApplication {
      * union.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetPreviousAnalysisSections
       | IAutoBePreliminaryGetPreviousDatabaseSchemas;
   }
 
-  /**
-   * Complete the database component by filling in table designs for the given
-   * skeleton.
-   */
-  export interface IComplete {
-    /** Type discriminator for completion request. */
-    type: "complete";
+  /** Submit database component table designs for validation. */
+  export interface IWrite {
+    /** Type discriminator for write submission. */
+    type: "write";
 
     /**
      * Analysis of the component's scope, entities, relationships, and table
@@ -54,3 +53,7 @@ export namespace IAutoBeDatabaseComponentApplication {
     tables: AutoBeDatabaseComponentTableDesign[];
   }
 }
+
+/** @deprecated Use IAutoBeDatabaseComponentApplication.IWrite instead. */
+export type IAutoBeDatabaseComponentApplicationComplete =
+  IAutoBeDatabaseComponentApplication.IWrite;

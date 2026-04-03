@@ -124,7 +124,7 @@ function createController(props: {
     input = repairSectionReviewInput(input);
     const result: IValidation<IAutoBeAnalyzeSectionReviewApplicationProps> =
       typia.validate<IAutoBeAnalyzeSectionReviewApplicationProps>(input);
-    if (result.success === false || result.data.request.type === "complete")
+    if (result.success === false || result.data.request.type === "write")
       return result;
     return props.preliminary.validate({
       thinking: result.data.thinking ?? "",
@@ -144,8 +144,7 @@ function createController(props: {
     application,
     execute: {
       process: (input) => {
-        if (input.request.type === "complete")
-          props.pointer.value = input.request;
+        if (input.request.type === "write") props.pointer.value = input.request;
       },
     } satisfies IAutoBeAnalyzeSectionReviewApplication,
   };

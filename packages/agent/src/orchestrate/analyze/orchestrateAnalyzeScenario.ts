@@ -31,10 +31,9 @@ export const orchestrateAnalyzeScenario = async (
       state: ctx.state(),
     });
   return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeAnalyzeScenarioApplication.IComplete | null> =
-      {
-        value: null,
-      };
+    const pointer: IPointer<IAutoBeAnalyzeScenarioApplication.IWrite | null> = {
+      value: null,
+    };
     const result: AutoBeContext.IResult = await ctx.conversate({
       source: SOURCE,
       controller: createController({
@@ -80,7 +79,7 @@ export const orchestrateAnalyzeScenario = async (
 };
 
 function createController(props: {
-  pointer: IPointer<IAutoBeAnalyzeScenarioApplication.IComplete | null>;
+  pointer: IPointer<IAutoBeAnalyzeScenarioApplication.IWrite | null>;
   preliminary: AutoBePreliminaryController<"previousAnalysisSections">;
 }): IAgenticaController.IClass {
   const validate = (
@@ -89,9 +88,12 @@ function createController(props: {
     input = repairMissingRequestType(input);
     const result: IValidation<IAutoBeAnalyzeScenarioApplication.IProps> =
       typia.validate<IAutoBeAnalyzeScenarioApplication.IProps>(input);
-    if (result.success === false) return result;
+    if (result.success === false) {
+      console.log("validation failure", JSON.stringify(result.data, null, 2));
+      return result;
+    }
 
-    if (result.data.request.type === "complete") return result;
+    if (result.data.request.type === "write") return result;
 
     return props.preliminary.validate({
       thinking: result.data.thinking ?? "",
@@ -111,8 +113,7 @@ function createController(props: {
     application,
     execute: {
       process: (input) => {
-        if (input.request.type === "complete")
-          props.pointer.value = input.request;
+        if (input.request.type === "write") props.pointer.value = input.request;
       },
     } satisfies IAutoBeAnalyzeScenarioApplication,
   };
@@ -161,7 +162,7 @@ const repairMissingRequestType = (input: unknown): unknown => {
       ...root,
       request: {
         ...request,
-        type: "complete",
+        type: "write",
       },
     };
   }
@@ -175,7 +176,7 @@ const repairFlattenedRequestPayload = (
 
   const completeLike =
     typeof input.type === "string" &&
-    input.type === "complete" &&
+    input.type === "write" &&
     typeof input.reason === "string" &&
     typeof input.prefix === "string";
   if (completeLike) {

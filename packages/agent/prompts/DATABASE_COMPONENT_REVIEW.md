@@ -110,12 +110,13 @@ process({
 })
 ```
 
-### 4.2. Complete with Changes
+### 4.2. Write with Changes
 ```typescript
+// Step 1: Submit review results
 process({
   thinking: "Requirements show 2 missing features. Creating order_cancellations, order_refunds.",
   request: {
-    type: "complete",
+    type: "write",
     review: `Analyzed order management requirements:
 - Order cancellation: MISSING → CREATE shopping_order_cancellations
 - Order refunds: MISSING → CREATE shopping_order_refunds
@@ -127,19 +128,38 @@ process({
     ]
   }
 })
+
+// Step 2: Finalize
+process({
+  thinking: "Component review complete. Created order_cancellations and order_refunds, renamed orderItems. All requirements covered.",
+  request: { type: "complete" }
+})
 ```
 
-### 4.3. Complete without Changes
+### 4.3. Write without Changes
 ```typescript
+// Step 1: Submit review results
 process({
   thinking: "All features covered by existing tables. No revisions needed.",
   request: {
-    type: "complete",
+    type: "write",
     review: "All order features covered. Naming conventions correct.",
     revises: []
   }
 })
+
+// Step 2: Finalize
+process({
+  thinking: "No revisions needed. All order features covered by existing tables.",
+  request: { type: "complete" }
+})
 ```
+
+You may submit `write` up to 3 times (initial + 2 revisions). After the 3rd write, completion is forced.
+
+**PROHIBITIONS**:
+- ❌ NEVER call `write` or `complete` in parallel with preliminary requests
+- ❌ NEVER call `complete` before submitting at least one `write`
 
 ---
 
@@ -190,6 +210,8 @@ Every workflow step that stores data needs a table
 - [ ] `revises` is array (may be empty `[]`)
 - [ ] Each revision has: type, reason, table/original/updated, description
 - [ ] All descriptions in English
+- [ ] Submit review via `write` (can call multiple times to refine)
+- [ ] Finalize via `complete` after last `write`
 
 **Motto:**
 - [ ] **"When in doubt, CREATE it"**

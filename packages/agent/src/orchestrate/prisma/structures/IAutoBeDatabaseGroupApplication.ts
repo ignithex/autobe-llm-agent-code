@@ -1,6 +1,7 @@
 import { AutoBeDatabaseGroup } from "@autobe/interface";
 import { tags } from "typia";
 
+import { IAutoBePreliminaryComplete } from "../../common/structures/IAutoBePreliminaryComplete";
 import { IAutoBePreliminaryGetAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetAnalysisSections";
 import { IAutoBePreliminaryGetPreviousAnalysisSections } from "../../common/structures/IAutoBePreliminaryGetPreviousAnalysisSections";
 import { IAutoBePreliminaryGetPreviousDatabaseSchemas } from "../../common/structures/IAutoBePreliminaryGetPreviousDatabaseSchemas";
@@ -13,8 +14,8 @@ export interface IAutoBeDatabaseGroupApplication {
 export namespace IAutoBeDatabaseGroupApplication {
   export interface IProps {
     /**
-     * Reasoning about your current state: what's missing (preliminary) or what
-     * you accomplished (completion).
+     * Reasoning: what's missing (preliminary), what you're submitting (write),
+     * or why you're finalizing (complete).
      */
     thinking: string;
 
@@ -23,16 +24,17 @@ export namespace IAutoBeDatabaseGroupApplication {
      * union.
      */
     request:
-      | IComplete
+      | IWrite
+      | IAutoBePreliminaryComplete
       | IAutoBePreliminaryGetAnalysisSections
       | IAutoBePreliminaryGetPreviousAnalysisSections
       | IAutoBePreliminaryGetPreviousDatabaseSchemas;
   }
 
-  /** Generate database component groups organized by business domains. */
-  export interface IComplete {
-    /** Type discriminator for completion request. */
-    type: "complete";
+  /** Submit database component groups for validation. */
+  export interface IWrite {
+    /** Type discriminator for write submission. */
+    type: "write";
 
     /**
      * Analysis of the requirements structure, domain organization, and
@@ -52,3 +54,7 @@ export namespace IAutoBeDatabaseGroupApplication {
     groups: AutoBeDatabaseGroup[] & tags.MinItems<1>;
   }
 }
+
+/** @deprecated Use IAutoBeDatabaseGroupApplication.IWrite instead. */
+export type IAutoBeDatabaseGroupApplicationComplete =
+  IAutoBeDatabaseGroupApplication.IWrite;

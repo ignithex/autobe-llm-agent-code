@@ -1,4 +1,7 @@
-import { IMicroAgenticaHistoryJson } from "@agentica/core";
+import {
+  AgenticaExecuteHistory,
+  IMicroAgenticaHistoryJson,
+} from "@agentica/core";
 import {
   AutoBeEventSource,
   AutoBePreliminaryAcquisition,
@@ -10,6 +13,7 @@ import {
   IValidation,
 } from "@typia/interface";
 import { OpenApiTypeChecker } from "@typia/utils";
+import { IPointer } from "tstl";
 import { v7 } from "uuid";
 
 import { AutoBeConfigConstant } from "../../constants/AutoBeConfigConstant";
@@ -53,6 +57,10 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
 
   // PAGINATION
   private analysisPageOffset: number = 0;
+  private previousWrites: IPreviousWrite[] = [];
+  private completed: IPointer<boolean> = {
+    value: false,
+  };
 
   /**
    * Initializes controller with data collections and auto-complements
@@ -138,8 +146,8 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
    *   found.
    */
   public validate(
-    input: IAutoBePreliminaryRequest<Kind>,
-  ): IValidation<IAutoBePreliminaryRequest<Kind>> {
+    input: IAutoBePreliminaryRequest<Kind, true>,
+  ): IValidation<IAutoBePreliminaryRequest<Kind, true>> {
     return validatePreliminary(this, input);
   }
 
@@ -279,6 +287,10 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
     return this.analysisPageOffset;
   }
 
+  public getPreviousWrite(): Record<string, unknown> | null {
+    return this.previousWrites.at(-1)?.raw ?? null;
+  }
+
   /** Advances analysis section metadata page by PAGE_SIZE. */
   public advanceAnalysisPage(): void {
     this.analysisPageOffset += AutoBeConfigConstant.ANALYSIS_PAGE_SIZE;
@@ -331,6 +343,9 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
       ) => (value: T | null) => IAutoBeOrchestrateResult<T>,
     ) => Promise<IAutoBeOrchestrateResult<T>>,
   ): Promise<T | never> {
+    this.completed.value = false satisfies boolean as boolean;
+    this.previousWrites = [];
+
     for (let i: number = 0; i < AutoBeConfigConstant.RAG_LIMIT; ++i) {
       const result: IAutoBeOrchestrateResult<T> = await process(
         (x) => (value) => ({
@@ -338,16 +353,52 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
           value,
         }),
       );
-      if (result.value !== null) return result.value;
+      if (result.value !== null) {
+        const executes: AgenticaExecuteHistory[] = result.histories.filter(
+          (h) => h.type === "execute",
+        );
+        const history: AgenticaExecuteHistory | undefined = executes.find(
+          (h) => (h.arguments.request as any).type === "write",
+        );
+        if (history === undefined)
+          throw new Error("No write execute found in histories.");
 
+        // clear completion
+        this.completed.value = false;
+
+        // store write result and raw arguments
+        const raw: any = history.arguments.request;
+        this.previousWrites.push({
+          value: result.value,
+          raw,
+        });
+        if (
+          this.previousWrites.length >=
+          AutoBeConfigConstant.PRELIMINARY_WRITE_LIMIT
+        )
+          break;
+      }
+
+      // orchestrate next iteration
       await orchestratePreliminary(ctx, {
         source_id: this.source_id,
         source: this.source,
         preliminary: this,
         trial: i + 1,
         histories: result.histories,
+        completed: this.completed,
       });
+      if (this.completed.value === true && this.previousWrites.length !== 0)
+        break;
     }
+
+    // console.log("----------------------------------");
+    // console.log(this.getSource(), this.previousWrites.length, this.completed);
+    // console.log("----------------------------------");
+
+    // check success
+    const last: IPreviousWrite | undefined = this.previousWrites.at(-1);
+    if (last !== undefined) return last.value;
 
     throw new AutoBePreliminaryExhaustedError();
   }
@@ -397,4 +448,9 @@ export namespace AutoBePreliminaryController {
       : never;
     databaseProperty: boolean;
   }
+}
+
+interface IPreviousWrite {
+  value: any;
+  raw: any;
 }
