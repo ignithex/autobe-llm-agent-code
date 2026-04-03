@@ -15,7 +15,7 @@ interface ICart {
   items: ICartItem[];
 }
 
-export const test_decouple_validate_unknown_property = () => {
+export const test_interface_schema_decouple_validate_not_a_cycle_edge = () => {
   const schemas: Record<string, AutoBeOpenApi.IJsonSchemaDescriptive> =
     typia.json.schemas<[ICartItem, ICart]>().components
       .schemas as unknown as Record<
@@ -30,10 +30,11 @@ export const test_decouple_validate_unknown_property = () => {
     ],
   };
 
+  // `name` is a valid property of ICartItem but is NOT a cycle edge
   const removal: AutoBeInterfaceSchemaDecoupleRemoval = {
-    reason: "Hallucinated property name",
+    reason: "Trying to remove a non-cycle property",
     typeName: "ICartItem",
-    propertyName: "nonExistentProp",
+    propertyName: "name",
     description: null,
     specification: null,
   };
@@ -49,9 +50,9 @@ export const test_decouple_validate_unknown_property = () => {
 
   TestValidator.equals("errors", errors, [
     {
-      path: "$input.removal.propertyName",
-      expected: "one of [cart, name]",
-      value: "nonExistentProp",
+      path: "$input.removal",
+      expected: "a removal that matches a cycle edge (sourceType.propertyName)",
+      value: "ICartItem.name",
     },
   ]);
 };
