@@ -1,11 +1,12 @@
 import { IAgenticaController } from "@agentica/core";
 import {
   AutoBeDatabaseComponent,
+  AutoBeDatabaseComponentEvent,
   AutoBeDatabaseGroup,
   AutoBeEventSource,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -41,14 +42,21 @@ export async function orchestrateDatabaseComponent(
   const components: AutoBeDatabaseComponent[] = await executeCachedBatch(
     ctx,
     domainGroups.map((group) => async (promptCacheKey) => {
-      const component: AutoBeDatabaseComponent = await process(ctx, {
-        group,
-        instruction: props.instruction,
-        prefix,
-        progress,
-        promptCacheKey,
-      });
-      return component;
+      const counter = new Singleton(() => ++progress.completed);
+      try {
+        const component: AutoBeDatabaseComponent = await process(ctx, {
+          group,
+          instruction: props.instruction,
+          prefix,
+          progress,
+          counter,
+          promptCacheKey,
+        });
+        return component;
+      } catch (error) {
+        counter.get();
+        throw error;
+      }
     }),
   );
   return AutoBeDatabaseComponentProgrammer.removeDuplicatedTable(components);
@@ -61,6 +69,7 @@ async function process(
     instruction: string;
     prefix: string | null;
     progress: AutoBeProgressEventBase;
+    counter: Singleton<number>;
     promptCacheKey: string;
   },
 ): Promise<AutoBeDatabaseComponent> {
@@ -101,50 +110,54 @@ async function process(
     },
   });
 
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeDatabaseComponentApplication.IWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        pointer,
-        preliminary,
-        prefix: props.prefix,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformDatabaseComponentsHistory(ctx.state(), {
-        instruction: props.instruction,
-        prefix: props.prefix,
-        preliminary,
-        group: props.group,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeDatabaseComponentEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeDatabaseComponentApplication.IWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          pointer,
+          preliminary,
+          prefix: props.prefix,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformDatabaseComponentsHistory(ctx.state(), {
+          instruction: props.instruction,
+          prefix: props.prefix,
+          preliminary,
+          group: props.group,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    // Build complete component from group skeleton + tables
-    const component: AutoBeDatabaseComponent = {
-      ...props.group,
-      tables: pointer.value.tables,
-    };
-    ctx.dispatch({
-      type: SOURCE,
-      id: v7(),
-      created_at: new Date().toISOString(),
-      analysis: pointer.value.analysis,
-      rationale: pointer.value.rationale,
-      component,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      step: ctx.state().analyze?.step ?? 0,
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-    });
-    return out(result)(component);
-  });
+      // Build complete component from group skeleton + tables
+      const component: AutoBeDatabaseComponent = {
+        ...props.group,
+        tables: pointer.value.tables,
+      };
+      return out(result)({
+        type: SOURCE,
+        id: v7(),
+        created_at: new Date().toISOString(),
+        analysis: pointer.value.analysis,
+        rationale: pointer.value.rationale,
+        component,
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        step: ctx.state().analyze?.step ?? 0,
+        total: props.progress.total,
+        completed: props.counter.get(),
+      });
+    },
+  );
+  ctx.dispatch(event);
+  return event.component;
 }
 
 function createController(props: {

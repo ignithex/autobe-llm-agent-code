@@ -6,7 +6,7 @@ import {
   AutoBeOpenApi,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -32,14 +32,16 @@ export async function orchestrateInterfaceOperationReview(
     await executeCachedBatch(
       ctx,
       props.operations.map((operation) => async (promptCacheKey) => {
+        const counter = new Singleton(() => ++props.progress.completed);
         try {
           return await process(ctx, {
             operation,
             promptCacheKey,
             progress: props.progress,
+            counter,
           });
         } catch {
-          ++props.progress.completed;
+          counter.get();
           return false;
         }
       }),
@@ -53,6 +55,7 @@ async function process(
     operation: AutoBeOpenApi.IOperation;
     progress: AutoBeProgressEventBase;
     promptCacheKey: string;
+    counter: Singleton<number>;
   },
 ): Promise<AutoBeOpenApi.IOperation | false> {
   const allSections: IAnalysisSectionEntry[] = convertToSectionEntries(
@@ -125,56 +128,58 @@ async function process(
       analysisSections: ragSections,
     },
   });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeInterfaceOperationReviewApplication.IWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createReviewController({
-        preliminary,
-        databaseSchemas: files,
-        operation: props.operation,
-        build: (next: IAutoBeInterfaceOperationReviewApplication.IWrite) => {
-          pointer.value = next;
-        },
-      }),
-      enforceFunctionCall: false,
-      ...transformInterfaceOperationReviewHistory({
-        preliminary,
-        operation: props.operation,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeInterfaceOperationReviewEvent =
+    await preliminary.orchestrate(ctx, async (out) => {
+      const pointer: IPointer<IAutoBeInterfaceOperationReviewApplication.IWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createReviewController({
+          preliminary,
+          databaseSchemas: files,
+          operation: props.operation,
+          build: (next: IAutoBeInterfaceOperationReviewApplication.IWrite) => {
+            pointer.value = next;
+          },
+        }),
+        enforceFunctionCall: false,
+        ...transformInterfaceOperationReviewHistory({
+          preliminary,
+          operation: props.operation,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    const content: AutoBeOpenApi.IOperation | null =
-      pointer.value.content !== null
-        ? {
-            ...props.operation,
-            description: pointer.value.content.description,
-            requestBody: pointer.value.content.requestBody,
-            responseBody: pointer.value.content.responseBody,
-          }
-        : null;
-    if (content !== null) AutoBeInterfaceOperationProgrammer.fix(content);
-    ctx.dispatch({
-      type: SOURCE,
-      id: v7(),
-      operation: props.operation,
-      review: pointer.value.review,
-      plan: pointer.value.plan,
-      content,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      created_at: new Date().toISOString(),
-      step: ctx.state().analyze?.step ?? 0,
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-    } satisfies AutoBeInterfaceOperationReviewEvent);
-    return out(result)(content ?? false);
-  });
+      const content: AutoBeOpenApi.IOperation | null =
+        pointer.value.content !== null
+          ? {
+              ...props.operation,
+              description: pointer.value.content.description,
+              requestBody: pointer.value.content.requestBody,
+              responseBody: pointer.value.content.responseBody,
+            }
+          : null;
+      if (content !== null) AutoBeInterfaceOperationProgrammer.fix(content);
+      return out(result)({
+        type: SOURCE,
+        id: v7(),
+        operation: props.operation,
+        review: pointer.value.review,
+        plan: pointer.value.plan,
+        content,
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        created_at: new Date().toISOString(),
+        step: ctx.state().analyze?.step ?? 0,
+        total: props.progress.total,
+        completed: props.counter.get(),
+      } satisfies AutoBeInterfaceOperationReviewEvent);
+    });
+  ctx.dispatch(event);
+  return event.content ?? false;
 }
 
 function createReviewController(props: {

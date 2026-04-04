@@ -157,56 +157,60 @@ async function execute(
       database: "ast",
     },
   });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeDatabaseCorrectApplication.IWrite | null> = {
-      value: null,
-    };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        preliminary,
-        build: (next) => {
-          pointer.value = next;
-        },
-      }),
-      enforceFunctionCall: true,
-      ...transformDatabaseCorrectHistory({
-        preliminary,
-        result: failure,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
-
-    const correction: AutoBeDatabase.IApplication = {
-      files: failure.data.files.map((file) => ({
-        filename: file.filename,
-        namespace: file.namespace,
-        models: file.models.map((model) => {
-          AutoBeDatabaseModelProgrammer.emend(model);
-          const newbie = pointer.value?.models.find(
-            (m) => m.name === model.name,
-          );
-          return newbie ?? model;
+  const pointer: IPointer<IAutoBeDatabaseCorrectApplication.IWrite | null> = {
+    value: null,
+  };
+  const event: AutoBeDatabaseCorrectEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          preliminary,
+          build: (next) => {
+            pointer.value = next;
+          },
         }),
-      })),
-    };
-    ctx.dispatch({
-      type: SOURCE,
-      id: v7(),
-      failure,
-      planning: pointer.value.planning,
-      correction: correction,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      step: ctx.state().analyze?.step ?? 0,
-      created_at: new Date().toISOString(),
-    } satisfies AutoBeDatabaseCorrectEvent);
-    return out(result)({
-      ...pointer.value,
-      correction,
-    });
-  });
+        enforceFunctionCall: true,
+        ...transformDatabaseCorrectHistory({
+          preliminary,
+          result: failure,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
+
+      const correction: AutoBeDatabase.IApplication = {
+        files: failure.data.files.map((file) => ({
+          filename: file.filename,
+          namespace: file.namespace,
+          models: file.models.map((model) => {
+            AutoBeDatabaseModelProgrammer.emend(model);
+            const newbie = pointer.value?.models.find(
+              (m) => m.name === model.name,
+            );
+            return newbie ?? model;
+          }),
+        })),
+      };
+      return out(result)({
+        type: SOURCE,
+        id: v7(),
+        failure,
+        planning: pointer.value.planning,
+        correction: correction,
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        step: ctx.state().analyze?.step ?? 0,
+        created_at: new Date().toISOString(),
+      } satisfies AutoBeDatabaseCorrectEvent);
+    },
+  );
+  ctx.dispatch(event);
+  return {
+    ...pointer.value!,
+    correction: event.correction,
+  };
 }
 
 interface IExecutionResult extends IAutoBeDatabaseCorrectApplication.IWrite {

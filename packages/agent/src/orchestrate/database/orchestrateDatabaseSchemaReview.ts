@@ -6,7 +6,7 @@ import {
   AutoBeEventSource,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -48,6 +48,7 @@ export async function orchestrateDatabaseSchemaReview(
     await executeCachedBatch(
       ctx,
       tableTasks.map((task) => async (promptCacheKey) => {
+        const counter = new Singleton(() => ++props.progress.completed);
         try {
           return await step(ctx, {
             application: props.application,
@@ -57,10 +58,11 @@ export async function orchestrateDatabaseSchemaReview(
               .flatMap((f) => f.models)
               .filter((m) => m.name !== task.model.name),
             progress: props.progress,
+            counter,
             promptCacheKey,
           });
         } catch {
-          ++props.progress.completed;
+          counter.get();
           return null;
         }
       }),
@@ -76,6 +78,7 @@ async function step(
     model: AutoBeDatabase.IModel;
     otherModels: AutoBeDatabase.IModel[];
     progress: AutoBeProgressEventBase;
+    counter: Singleton<number>;
     promptCacheKey: string;
   },
 ): Promise<AutoBeDatabaseSchemaReviewEvent> {
@@ -107,52 +110,56 @@ async function step(
       database: "ast",
     },
   });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeDatabaseSchemaReviewApplication.IWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        preliminary,
-        build: (next) => {
-          pointer.value = next;
-        },
-        targetComponent: props.component,
-        model: props.model,
-        otherModels: props.otherModels,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformDatabaseSchemaReviewHistory({
-        component: props.component,
-        model: props.model,
-        otherModels: props.otherModels,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeDatabaseSchemaReviewEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeDatabaseSchemaReviewApplication.IWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          preliminary,
+          build: (next) => {
+            pointer.value = next;
+          },
+          targetComponent: props.component,
+          model: props.model,
+          otherModels: props.otherModels,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformDatabaseSchemaReviewHistory({
+          component: props.component,
+          model: props.model,
+          otherModels: props.otherModels,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    const event: AutoBeDatabaseSchemaReviewEvent = {
-      type: SOURCE,
-      id: v7(),
-      created_at: start.toISOString(),
-      namespace: props.component.namespace,
-      review: pointer.value.review,
-      plan: pointer.value.plan,
-      modelName: props.model.name,
-      content: pointer.value.content,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      completed: ++props.progress.completed,
-      total: props.progress.total,
-      step: ctx.state().analyze?.step ?? 0,
-    };
-    ctx.dispatch(event);
-    return out(result)(event);
-  });
+      const event: AutoBeDatabaseSchemaReviewEvent = {
+        type: SOURCE,
+        id: v7(),
+        created_at: start.toISOString(),
+        namespace: props.component.namespace,
+        review: pointer.value.review,
+        plan: pointer.value.plan,
+        modelName: props.model.name,
+        content: pointer.value.content,
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        completed: props.counter.get(),
+        total: props.progress.total,
+        step: ctx.state().analyze?.step ?? 0,
+      };
+      return out(result)(event);
+    },
+  );
+  ctx.dispatch(event);
+  return event;
 }
 
 function createController(props: {

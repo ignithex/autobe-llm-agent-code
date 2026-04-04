@@ -8,7 +8,7 @@ import {
   AutoBeRealizeTransformerFunction,
   AutoBeRealizeWriteEvent,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, ILlmController, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -45,21 +45,29 @@ export async function orchestrateRealizeOperationWrite(
   );
   return await executeCachedBatch(
     ctx,
-    scenarios.map(
-      (s) => (promptCacheKey) =>
-        forceRetry(() =>
-          process(ctx, {
-            document,
-            totalAuthorizations: props.authorizations,
-            collectors: props.collectors,
-            transformers: props.transformers,
-            authorization: s.decoratorEvent ?? null,
-            scenario: s,
-            progress: props.progress,
-            promptCacheKey,
-          }),
-        ),
-    ),
+    scenarios.map((s) => {
+      const counter = new Singleton(() => ++props.progress.completed);
+      return async (promptCacheKey: string) => {
+        try {
+          return await forceRetry(() =>
+            process(ctx, {
+              document,
+              totalAuthorizations: props.authorizations,
+              collectors: props.collectors,
+              transformers: props.transformers,
+              authorization: s.decoratorEvent ?? null,
+              scenario: s,
+              progress: props.progress,
+              counter,
+              promptCacheKey,
+            }),
+          );
+        } catch (error) {
+          counter.get();
+          throw error;
+        }
+      };
+    }),
   );
 }
 
@@ -73,6 +81,7 @@ async function process(
     scenario: IAutoBeRealizeScenarioResult;
     transformers: AutoBeRealizeTransformerFunction[];
     progress: AutoBeProgressEventBase;
+    counter: Singleton<number>;
     promptCacheKey: string;
   },
 ): Promise<AutoBeRealizeOperationFunction> {
@@ -134,72 +143,76 @@ async function process(
       analysisSections: ragSections,
     },
   });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeRealizeOperationWriteApplication.IWrite | null> =
-      {
-        value: null,
-      };
-    const dto: Record<string, string> =
-      await AutoBeRealizeOperationProgrammer.writeStructures(
-        ctx,
-        props.scenario.operation,
-      );
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: "realizeWrite",
-      controller: createController({
-        functionName: props.scenario.functionName,
-        build: (next) => {
-          pointer.value = next;
-        },
-        preliminary,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformRealizeOperationWriteHistory({
-        state: ctx.state(),
-        scenario: props.scenario,
-        authorization: props.authorization,
-        totalAuthorizations: props.totalAuthorizations,
-        collectors: props.collectors,
-        transformers: props.transformers,
-        dto,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
-
-    const functor: AutoBeRealizeOperationFunction = {
-      type: "operation",
-      endpoint: {
-        method: props.scenario.operation.method,
-        path: props.scenario.operation.path,
-      },
-      location: props.scenario.location,
-      name: props.scenario.functionName,
-      content: await AutoBeRealizeOperationProgrammer.replaceImportStatements(
-        ctx,
+  const event: AutoBeRealizeWriteEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeRealizeOperationWriteApplication.IWrite | null> =
         {
-          operation: props.scenario.operation,
-          schemas: props.document.components.schemas,
-          code: pointer.value.revise.final ?? pointer.value.draft,
-          payload: props.authorization?.payload.name,
+          value: null,
+        };
+      const dto: Record<string, string> =
+        await AutoBeRealizeOperationProgrammer.writeStructures(
+          ctx,
+          props.scenario.operation,
+        );
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: "realizeWrite",
+        controller: createController({
+          functionName: props.scenario.functionName,
+          build: (next) => {
+            pointer.value = next;
+          },
+          preliminary,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformRealizeOperationWriteHistory({
+          state: ctx.state(),
+          scenario: props.scenario,
+          authorization: props.authorization,
+          totalAuthorizations: props.totalAuthorizations,
+          collectors: props.collectors,
+          transformers: props.transformers,
+          dto,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
+
+      const functor: AutoBeRealizeOperationFunction = {
+        type: "operation",
+        endpoint: {
+          method: props.scenario.operation.method,
+          path: props.scenario.operation.path,
         },
-      ),
-    };
-    ctx.dispatch({
-      id: v7(),
-      type: "realizeWrite",
-      function: functor,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      completed: ++props.progress.completed,
-      total: props.progress.total,
-      step: ctx.state().analyze?.step ?? 0,
-      created_at: new Date().toISOString(),
-    } satisfies AutoBeRealizeWriteEvent);
-    return out(result)(functor);
-  });
+        location: props.scenario.location,
+        name: props.scenario.functionName,
+        content: await AutoBeRealizeOperationProgrammer.replaceImportStatements(
+          ctx,
+          {
+            operation: props.scenario.operation,
+            schemas: props.document.components.schemas,
+            code: pointer.value.revise.final ?? pointer.value.draft,
+            payload: props.authorization?.payload.name,
+          },
+        ),
+      };
+      return out(result)({
+        id: v7(),
+        type: "realizeWrite",
+        function: functor,
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        completed: props.counter.get(),
+        total: props.progress.total,
+        step: ctx.state().analyze?.step ?? 0,
+        created_at: new Date().toISOString(),
+      } satisfies AutoBeRealizeWriteEvent);
+    },
+  );
+  ctx.dispatch(event);
+  return event.function as AutoBeRealizeOperationFunction;
 }
 
 function createController(props: {

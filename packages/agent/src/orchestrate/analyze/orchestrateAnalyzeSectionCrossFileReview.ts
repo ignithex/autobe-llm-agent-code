@@ -9,7 +9,7 @@ import {
   AutoBeEventSource,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -61,49 +61,54 @@ export const orchestrateAnalyzeSectionCrossFileReview = async (
       state: ctx.state(),
       dispatch: (e) => ctx.dispatch(e),
     });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        pointer,
-        preliminary,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformAnalyzeSectionCrossFileReviewHistory(ctx, {
-        scenario: props.scenario,
-        allFileSummaries: props.allFileSummaries,
-        mechanicalViolationSummary: props.mechanicalViolationSummary,
-        fileDecisions: props.fileDecisions,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const counter = new Singleton(() => ++props.progress.completed);
+  const event: AutoBeAnalyzeSectionReviewEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          pointer,
+          preliminary,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformAnalyzeSectionCrossFileReviewHistory(ctx, {
+          scenario: props.scenario,
+          allFileSummaries: props.allFileSummaries,
+          mechanicalViolationSummary: props.mechanicalViolationSummary,
+          fileDecisions: props.fileDecisions,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    const event: AutoBeAnalyzeSectionReviewEvent = {
-      type: SOURCE,
-      id: v7(),
-      fileResults: pointer.value.fileResults.map((fr) => ({
-        ...fr,
-        revisedSections: null,
-        rejectedModuleUnits: fr.rejectedModuleUnits ?? null,
-      })),
-      acquisition: preliminary.getAcquisition(),
-      tokenUsage: result.tokenUsage,
-      metric: result.metric,
-      step: (ctx.state().analyze?.step ?? -1) + 1,
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-      retry: props.retry,
-      created_at: new Date().toISOString(),
-    };
-    ctx.dispatch(event);
-    return out(result)(event);
-  });
+      const event: AutoBeAnalyzeSectionReviewEvent = {
+        type: SOURCE,
+        id: v7(),
+        fileResults: pointer.value.fileResults.map((fr) => ({
+          ...fr,
+          revisedSections: null,
+          rejectedModuleUnits: fr.rejectedModuleUnits ?? null,
+        })),
+        acquisition: preliminary.getAcquisition(),
+        tokenUsage: result.tokenUsage,
+        metric: result.metric,
+        step: (ctx.state().analyze?.step ?? -1) + 1,
+        total: props.progress.total,
+        completed: counter.get(),
+        retry: props.retry,
+        created_at: new Date().toISOString(),
+      };
+      return out(result)(event);
+    },
+  );
+  ctx.dispatch(event);
+  return event;
 };
 
 function createController(props: {

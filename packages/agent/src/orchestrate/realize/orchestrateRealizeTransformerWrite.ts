@@ -9,7 +9,7 @@ import {
   AutoBeRealizeWriteEvent,
 } from "@autobe/interface";
 import { AutoBeOpenApiTypeChecker } from "@autobe/utils";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, ILlmController, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -55,17 +55,19 @@ export async function orchestrateRealizeTransformerWrite(
   props.progress.total += props.plans.length;
   return await executeCachedBatch(
     ctx,
-    props.plans.map(
-      (x) => (promptCacheKey) =>
+    props.plans.map((x) => {
+      const counter = new Singleton(() => ++props.progress.completed);
+      return (promptCacheKey: string) =>
         forceRetry(() =>
           process(ctx, {
             progress: props.progress,
+            counter,
             neighbors: getNeighbors(x),
             plan: x,
             promptCacheKey,
           }),
-        ),
-    ),
+        );
+    }),
   );
 }
 
@@ -76,6 +78,7 @@ async function process(
     neighbors: AutoBeRealizeTransformerPlan[];
     promptCacheKey: string;
     progress: AutoBeProgressEventBase;
+    counter: Singleton<number>;
   },
 ): Promise<AutoBeRealizeTransformerFunction> {
   const models: AutoBeDatabase.IModel[] = ctx
@@ -98,62 +101,66 @@ async function process(
         ),
       },
     });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeRealizeTransformerWriteApplication.IWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: "realizeWrite",
-      controller: createController({
-        application: ctx.state().database!.result.data,
-        document,
-        plan: props.plan,
-        neighbors: props.neighbors,
-        build: (next) => {
-          pointer.value = next;
-        },
-        preliminary,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...(await transformRealizeTransformerWriteHistory(ctx, {
-        plan: props.plan,
-        neighbors: props.neighbors,
-        preliminary,
-      })),
-    });
-    if (pointer.value === null) return out(result)(null);
-
-    const content: string =
-      await AutoBeRealizeTransformerProgrammer.replaceImportStatements(ctx, {
-        dtoTypeName,
-        schemas: document.components.schemas,
-        code: pointer.value.revise.final ?? pointer.value.draft,
+  const event: AutoBeRealizeWriteEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeRealizeTransformerWriteApplication.IWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: "realizeWrite",
+        controller: createController({
+          application: ctx.state().database!.result.data,
+          document,
+          plan: props.plan,
+          neighbors: props.neighbors,
+          build: (next) => {
+            pointer.value = next;
+          },
+          preliminary,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...(await transformRealizeTransformerWriteHistory(ctx, {
+          plan: props.plan,
+          neighbors: props.neighbors,
+          preliminary,
+        })),
       });
-    const functor: AutoBeRealizeTransformerFunction = {
-      type: "transformer",
-      plan: props.plan,
-      neighbors: AutoBeRealizeTransformerProgrammer.getNeighbors(content),
-      location: `src/transformers/${AutoBeRealizeTransformerProgrammer.getName(
-        dtoTypeName,
-      )}.ts`,
-      content,
-    };
-    ctx.dispatch({
-      id: v7(),
-      type: "realizeWrite",
-      function: functor,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      completed: ++props.progress.completed,
-      total: props.progress.total,
-      step: ctx.state().analyze?.step ?? 0,
-      created_at: new Date().toISOString(),
-    } satisfies AutoBeRealizeWriteEvent);
-    return out(result)(functor);
-  });
+      if (pointer.value === null) return out(result)(null);
+
+      const content: string =
+        await AutoBeRealizeTransformerProgrammer.replaceImportStatements(ctx, {
+          dtoTypeName,
+          schemas: document.components.schemas,
+          code: pointer.value.revise.final ?? pointer.value.draft,
+        });
+      const functor: AutoBeRealizeTransformerFunction = {
+        type: "transformer",
+        plan: props.plan,
+        neighbors: AutoBeRealizeTransformerProgrammer.getNeighbors(content),
+        location: `src/transformers/${AutoBeRealizeTransformerProgrammer.getName(
+          dtoTypeName,
+        )}.ts`,
+        content,
+      };
+      return out(result)({
+        id: v7(),
+        type: "realizeWrite",
+        function: functor,
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        completed: props.counter.get(),
+        total: props.progress.total,
+        step: ctx.state().analyze?.step ?? 0,
+        created_at: new Date().toISOString(),
+      } satisfies AutoBeRealizeWriteEvent);
+    },
+  );
+  ctx.dispatch(event);
+  return event.function as AutoBeRealizeTransformerFunction;
 }
 
 function createController(props: {

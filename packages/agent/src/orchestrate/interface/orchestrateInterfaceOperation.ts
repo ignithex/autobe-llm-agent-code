@@ -9,7 +9,7 @@ import {
 } from "@autobe/interface";
 import { AutoBeOpenApiEndpointComparator } from "@autobe/utils";
 import { NamingConvention } from "@typia/utils";
-import { HashMap, IPointer, Pair } from "tstl";
+import { HashMap, IPointer, Pair, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -46,10 +46,12 @@ export async function orchestrateInterfaceOperation(
     await executeCachedBatch(
       ctx,
       props.designs.map((design) => async (promptCacheKey) => {
+        const counter = new Singleton(() => ++progress.completed);
         try {
           const row: AutoBeOpenApi.IOperation[] = await forceRetry(
             () =>
               process(ctx, {
+                counter,
                 design,
                 progress,
                 promptCacheKey,
@@ -61,6 +63,7 @@ export async function orchestrateInterfaceOperation(
           return row;
         } catch (error) {
           console.log("operation", design, error);
+          counter.get();
           throw error;
         }
       }),
@@ -135,6 +138,7 @@ export async function orchestrateInterfaceOperation(
 async function process(
   ctx: AutoBeContext,
   props: {
+    counter: Singleton<number>;
     design: AutoBeInterfaceEndpointDesign;
     progress: AutoBeProgressEventBase;
     promptCacheKey: string;
@@ -185,82 +189,86 @@ async function process(
       analysisSections: ragSections,
     },
   });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeInterfaceOperationApplication.IWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        preliminary,
-        build: (complete) => {
-          pointer.value = complete;
-        },
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformInterfaceOperationHistory({
-        endpoint: props.design.endpoint,
-        instruction: props.instruction,
-        prefix,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeInterfaceOperationEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeInterfaceOperationApplication.IWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          preliminary,
+          build: (complete) => {
+            pointer.value = complete;
+          },
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformInterfaceOperationHistory({
+          endpoint: props.design.endpoint,
+          instruction: props.instruction,
+          prefix,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    AutoBeInterfaceOperationProgrammer.fix(pointer.value.operation);
-    for (const p of pointer.value.operation.parameters)
-      p.schema = AutoBeJsonSchemaFactory.fixSchema(p.schema);
+      AutoBeInterfaceOperationProgrammer.fix(pointer.value.operation);
+      for (const p of pointer.value.operation.parameters)
+        p.schema = AutoBeJsonSchemaFactory.fixSchema(p.schema);
 
-    // Use authorizationActors from endpoint design (not from LLM)
-    const authorizationActors: string[] = props.design.authorizationActors;
-    const matrix: AutoBeOpenApi.IOperation[] =
-      authorizationActors.length === 0
-        ? [
-            {
-              ...pointer.value.operation,
-              path:
-                "/" +
-                [prefix, ...pointer.value.operation.path.split("/")]
-                  .filter((it) => it !== "")
-                  .join("/"),
-              authorizationActor: null,
-              authorizationType: null,
-              prerequisites: [],
-            } satisfies AutoBeOpenApi.IOperation,
-          ]
-        : authorizationActors.map(
-            (actor) =>
-              ({
-                ...pointer.value!.operation,
+      // Use authorizationActors from endpoint design (not from LLM)
+      const authorizationActors: string[] = props.design.authorizationActors;
+      const matrix: AutoBeOpenApi.IOperation[] =
+        authorizationActors.length === 0
+          ? [
+              {
+                ...pointer.value.operation,
                 path:
                   "/" +
-                  [prefix, actor, ...pointer.value!.operation.path.split("/")]
+                  [prefix, ...pointer.value.operation.path.split("/")]
                     .filter((it) => it !== "")
                     .join("/"),
-                authorizationActor: actor,
+                authorizationActor: null,
                 authorizationType: null,
                 prerequisites: [],
-              }) satisfies AutoBeOpenApi.IOperation,
-          );
-    ++props.progress.completed;
+              } satisfies AutoBeOpenApi.IOperation,
+            ]
+          : authorizationActors.map(
+              (actor) =>
+                ({
+                  ...pointer.value!.operation,
+                  path:
+                    "/" +
+                    [prefix, actor, ...pointer.value!.operation.path.split("/")]
+                      .filter((it) => it !== "")
+                      .join("/"),
+                  authorizationActor: actor,
+                  authorizationType: null,
+                  prerequisites: [],
+                }) satisfies AutoBeOpenApi.IOperation,
+            );
+      props.counter.get();
 
-    ctx.dispatch({
-      type: SOURCE,
-      id: v7(),
-      analysis: pointer.value.analysis,
-      rationale: pointer.value.rationale,
-      operations: matrix,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      ...props.progress,
-      step: ctx.state().analyze?.step ?? 0,
-      created_at: new Date().toISOString(),
-    } satisfies AutoBeInterfaceOperationEvent);
-    return out(result)(matrix);
-  });
+      return out(result)({
+        type: SOURCE,
+        id: v7(),
+        analysis: pointer.value.analysis,
+        rationale: pointer.value.rationale,
+        operations: matrix,
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        ...props.progress,
+        step: ctx.state().analyze?.step ?? 0,
+        created_at: new Date().toISOString(),
+      } satisfies AutoBeInterfaceOperationEvent);
+    },
+  );
+  ctx.dispatch(event);
+  return event.operations;
 }
 
 function createController(props: {

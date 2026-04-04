@@ -7,7 +7,7 @@ import {
   AutoBeProgressEventBase,
 } from "@autobe/interface";
 import { AutoBeOpenApiTypeChecker } from "@autobe/utils";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -45,6 +45,7 @@ export async function orchestrateInterfaceSchemaRefine(
   await executeCachedBatch(
     ctx,
     typeNames.map((it) => async (promptCacheKey) => {
+      const counter = new Singleton(() => ++props.progress.completed);
       const predicate = (key: string) => key === it;
       const operations: AutoBeOpenApi.IOperation[] =
         props.document.operations.filter(
@@ -55,7 +56,7 @@ export async function orchestrateInterfaceSchemaRefine(
       try {
         const schema: AutoBeOpenApi.IJsonSchema = props.schemas[it];
         if (AutoBeOpenApiTypeChecker.isObject(schema) === false) {
-          --props.progress.total;
+          counter.get();
           return;
         }
         const refined: AutoBeOpenApi.IJsonSchemaDescriptive.IObject =
@@ -67,11 +68,12 @@ export async function orchestrateInterfaceSchemaRefine(
             schema,
             progress: props.progress,
             promptCacheKey,
+            counter,
           });
         x[it] = refined;
       } catch (error) {
         console.log("interfaceSchemaRefine failure", it, error);
-        --props.progress.total;
+        counter.get();
       }
     }),
   );
@@ -88,6 +90,7 @@ async function process(
     schema: AutoBeOpenApi.IJsonSchema.IObject;
     progress: AutoBeProgressEventBase;
     promptCacheKey: string;
+    counter: Singleton<number>;
   },
 ): Promise<AutoBeOpenApi.IJsonSchemaDescriptive.IObject> {
   const preliminary: AutoBePreliminaryController<
@@ -144,62 +147,63 @@ async function process(
       })(),
     },
   });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeInterfaceSchemaRefineApplication.IWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController(ctx, {
-        typeName: props.typeName,
-        operations: props.document.operations,
-        schema: props.schema,
-        preliminary,
-        pointer,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformInterfaceSchemaRefineHistory({
-        state: ctx.state(),
-        instruction: props.instruction,
-        typeName: props.typeName,
-        operations: props.operations,
-        schema: props.schema,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeInterfaceSchemaRefineEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeInterfaceSchemaRefineApplication.IWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController(ctx, {
+          typeName: props.typeName,
+          operations: props.document.operations,
+          schema: props.schema,
+          preliminary,
+          pointer,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformInterfaceSchemaRefineHistory({
+          state: ctx.state(),
+          instruction: props.instruction,
+          typeName: props.typeName,
+          operations: props.operations,
+          schema: props.schema,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    // Apply refines to generate the enriched schema content
-    const content: AutoBeOpenApi.IJsonSchemaDescriptive.IObject =
-      AutoBeInterfaceSchemaRefineProgrammer.execute({
+      return out(result)({
+        type: SOURCE,
+        id: v7(),
+        typeName: props.typeName,
         schema: props.schema,
+        review: pointer.value.review,
         databaseSchema: pointer.value.databaseSchema,
         specification: pointer.value.specification,
         description: pointer.value.description,
+        excludes: pointer.value.excludes,
         revises: pointer.value.revises,
-      });
-    ctx.dispatch({
-      type: SOURCE,
-      id: v7(),
-      typeName: props.typeName,
-      schema: props.schema,
-      review: pointer.value.review,
-      databaseSchema: pointer.value.databaseSchema,
-      specification: pointer.value.specification,
-      description: pointer.value.description,
-      excludes: pointer.value.excludes,
-      revises: pointer.value.revises,
-      acquisition: preliminary.getAcquisition(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      step: ctx.state().analyze?.step ?? 0,
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-      created_at: new Date().toISOString(),
-    } satisfies AutoBeInterfaceSchemaRefineEvent);
-    return out(result)(content);
+        acquisition: preliminary.getAcquisition(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        step: ctx.state().analyze?.step ?? 0,
+        total: props.progress.total,
+        completed: props.counter.get(),
+        created_at: new Date().toISOString(),
+      } satisfies AutoBeInterfaceSchemaRefineEvent);
+    },
+  );
+  ctx.dispatch(event);
+  return AutoBeInterfaceSchemaRefineProgrammer.execute({
+    schema: props.schema,
+    databaseSchema: event.databaseSchema,
+    specification: event.specification,
+    description: event.description,
+    revises: event.revises,
   });
 }
 

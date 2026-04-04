@@ -9,7 +9,7 @@ import {
   AutoBeEventSource,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -55,6 +55,7 @@ export const orchestrateAnalyzeSectionReview = async (
     retry: number;
   },
 ): Promise<AutoBeAnalyzeSectionReviewEvent> => {
+  const counter = new Singleton(() => ++props.progress.completed);
   const preliminary: AutoBePreliminaryController<"previousAnalysisSections"> =
     new AutoBePreliminaryController({
       application:
@@ -64,54 +65,58 @@ export const orchestrateAnalyzeSectionReview = async (
       state: ctx.state(),
       dispatch: (e) => ctx.dispatch(e),
     });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeAnalyzeSectionReviewApplicationComplete | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        pointer,
-        preliminary,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformAnalyzeSectionReviewHistory(ctx, {
-        scenario: props.scenario,
-        file: props.file,
-        moduleEvent: props.moduleEvent,
-        moduleIndex: props.moduleIndex,
-        unitEvent: props.unitEvent,
-        moduleSectionEvents: props.moduleSectionEvents,
-        siblingModuleSummaries: props.siblingModuleSummaries,
-        feedback: props.feedback,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeAnalyzeSectionReviewEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeAnalyzeSectionReviewApplicationComplete | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          pointer,
+          preliminary,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformAnalyzeSectionReviewHistory(ctx, {
+          scenario: props.scenario,
+          file: props.file,
+          moduleEvent: props.moduleEvent,
+          moduleIndex: props.moduleIndex,
+          unitEvent: props.unitEvent,
+          moduleSectionEvents: props.moduleSectionEvents,
+          siblingModuleSummaries: props.siblingModuleSummaries,
+          feedback: props.feedback,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    // Map LLM's fileIndex (always 0 for single file) to actual fileIndex
-    const event: AutoBeAnalyzeSectionReviewEvent = {
-      type: SOURCE,
-      id: v7(),
-      fileResults: pointer.value.fileResults.map((fr) => ({
-        ...fr,
-        fileIndex: props.fileIndex,
-        rejectedModuleUnits: fr.rejectedModuleUnits ?? null,
-      })),
-      acquisition: preliminary.getAcquisition(),
-      tokenUsage: result.tokenUsage,
-      metric: result.metric,
-      step: (ctx.state().analyze?.step ?? -1) + 1,
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-      retry: props.retry,
-      created_at: new Date().toISOString(),
-    };
-    ctx.dispatch(event);
-    return out(result)(event);
-  });
+      // Map LLM's fileIndex (always 0 for single file) to actual fileIndex
+      const event: AutoBeAnalyzeSectionReviewEvent = {
+        type: SOURCE,
+        id: v7(),
+        fileResults: pointer.value.fileResults.map((fr) => ({
+          ...fr,
+          fileIndex: props.fileIndex,
+          rejectedModuleUnits: fr.rejectedModuleUnits ?? null,
+        })),
+        acquisition: preliminary.getAcquisition(),
+        tokenUsage: result.tokenUsage,
+        metric: result.metric,
+        step: (ctx.state().analyze?.step ?? -1) + 1,
+        total: props.progress.total,
+        completed: counter.get(),
+        retry: props.retry,
+        created_at: new Date().toISOString(),
+      };
+      return out(result)(event);
+    },
+  );
+  ctx.dispatch(event);
+  return event;
 };
 
 function createController(props: {

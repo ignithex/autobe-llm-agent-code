@@ -5,10 +5,11 @@ import {
   AutoBeOpenApi,
   AutoBeProgressEventBase,
   AutoBeTestScenario,
+  AutoBeTestScenarioEvent,
 } from "@autobe/interface";
 import { AutoBeOpenApiEndpointComparator } from "@autobe/utils";
 import { NamingConvention } from "@typia/utils";
-import { HashMap, HashSet, IPointer } from "tstl";
+import { HashMap, HashSet, IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -60,18 +61,20 @@ export const orchestrateTestScenario = async (
   const matrix: AutoBeTestScenario[][] = await executeCachedBatch(
     ctx,
     document.operations.map((operation) => async (promptCacheKey) => {
+      const counter = new Singleton(() => ++progress.completed);
       try {
         return await process(ctx, {
           dict,
           document,
           operation,
           progress,
+          counter,
           promptCacheKey,
           instruction,
         });
       } catch (error) {
+        counter.get();
         console.log(operation, error);
-        --progress.total;
         return [];
       }
     }),
@@ -107,6 +110,7 @@ async function process(
     operation: AutoBeOpenApi.IOperation;
     document: AutoBeOpenApi.IDocument;
     progress: AutoBeProgressEventBase;
+    counter: Singleton<number>;
     promptCacheKey: string;
     instruction: string;
   },
@@ -167,53 +171,56 @@ async function process(
     },
   });
 
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<AutoBeTestScenario[] | null> = {
-      value: null,
-    };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        dict: props.dict,
-        operation: props.operation,
-        authorizations,
-        preliminary,
-        build: (scenarios) => {
-          // Normalize function name to snake_case
-          for (const s of scenarios)
-            s.functionName = NamingConvention.snake(s.functionName);
-          pointer.value ??= [];
-          pointer.value.push(...scenarios);
-        },
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformTestScenarioHistory({
-        state: ctx.state(),
-        operation: props.operation,
-        instruction: props.instruction,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeTestScenarioEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<AutoBeTestScenario[] | null> = {
+        value: null,
+      };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          dict: props.dict,
+          operation: props.operation,
+          authorizations,
+          preliminary,
+          build: (scenarios) => {
+            // Normalize function name to snake_case
+            for (const s of scenarios)
+              s.functionName = NamingConvention.snake(s.functionName);
+            pointer.value ??= [];
+            pointer.value.push(...scenarios);
+          },
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformTestScenarioHistory({
+          state: ctx.state(),
+          operation: props.operation,
+          instruction: props.instruction,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    pointer.value.splice(3);
+      pointer.value.splice(3);
 
-    // Dispatch event
-    ctx.dispatch({
-      type: SOURCE,
-      id: v7(),
-      metric: result.metric,
-      tokenUsage: result.tokenUsage,
-      scenarios: pointer.value,
-      acquisition: preliminary.getAcquisition(),
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-      step: ctx.state().interface?.step ?? 0,
-      created_at: new Date().toISOString(),
-    });
-    return out(result)(pointer.value);
-  });
+      return out(result)({
+        type: SOURCE,
+        id: v7(),
+        metric: result.metric,
+        tokenUsage: result.tokenUsage,
+        scenarios: pointer.value,
+        acquisition: preliminary.getAcquisition(),
+        total: props.progress.total,
+        completed: props.counter.get(),
+        step: ctx.state().interface?.step ?? 0,
+        created_at: new Date().toISOString(),
+      });
+    },
+  );
+  ctx.dispatch(event);
+  return event.scenarios;
 }
 
 function createController(props: {

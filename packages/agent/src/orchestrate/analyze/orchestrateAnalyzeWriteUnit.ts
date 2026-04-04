@@ -7,7 +7,7 @@ import {
   AutoBeEventSource,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -34,6 +34,7 @@ export const orchestrateAnalyzeWriteUnit = async (
     retry: number;
   },
 ): Promise<AutoBeAnalyzeWriteUnitEvent> => {
+  const counter = new Singleton(() => ++props.progress.completed);
   const preliminary: AutoBePreliminaryController<"previousAnalysisSections"> =
     new AutoBePreliminaryController({
       application: typia.json.application<IAutoBeAnalyzeWriteUnitApplication>(),
@@ -42,46 +43,52 @@ export const orchestrateAnalyzeWriteUnit = async (
       state: ctx.state(),
       dispatch: (e) => ctx.dispatch(e),
     });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationWrite | null> = {
-      value: null,
-    };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        pointer,
-        preliminary,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformAnalyzeWriteUnitHistory(ctx, {
-        scenario: props.scenario,
-        file: props.file,
-        moduleEvent: props.moduleEvent,
-        moduleIndex: props.moduleIndex,
-        feedback: props.feedback,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
 
-    const event: AutoBeAnalyzeWriteUnitEvent = {
-      type: SOURCE,
-      id: v7(),
-      moduleIndex: pointer.value.moduleIndex,
-      unitSections: pointer.value.unitSections,
-      acquisition: preliminary.getAcquisition(),
-      tokenUsage: result.tokenUsage,
-      metric: result.metric,
-      step: (ctx.state().analyze?.step ?? -1) + 1,
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-      retry: props.retry,
-      created_at: new Date().toISOString(),
-    };
-    ctx.dispatch(event);
-    return out(result)(event);
-  });
+  const event: AutoBeAnalyzeWriteUnitEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          pointer,
+          preliminary,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformAnalyzeWriteUnitHistory(ctx, {
+          scenario: props.scenario,
+          file: props.file,
+          moduleEvent: props.moduleEvent,
+          moduleIndex: props.moduleIndex,
+          feedback: props.feedback,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
+
+      const event: AutoBeAnalyzeWriteUnitEvent = {
+        type: SOURCE,
+        id: v7(),
+        moduleIndex: pointer.value.moduleIndex,
+        unitSections: pointer.value.unitSections,
+        acquisition: preliminary.getAcquisition(),
+        tokenUsage: result.tokenUsage,
+        metric: result.metric,
+        step: (ctx.state().analyze?.step ?? -1) + 1,
+        total: props.progress.total,
+        completed: counter.get(),
+        retry: props.retry,
+        created_at: new Date().toISOString(),
+      };
+      return out(result)(event);
+    },
+  );
+  ctx.dispatch(event);
+  return event;
 };
 
 function createController(props: {

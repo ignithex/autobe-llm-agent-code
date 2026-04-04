@@ -8,7 +8,7 @@ import {
   AutoBeEventSource,
   AutoBeProgressEventBase,
 } from "@autobe/interface";
-import { IPointer } from "tstl";
+import { IPointer, Singleton } from "tstl";
 import typia, { ILlmApplication, IValidation } from "typia";
 import { v7 } from "uuid";
 
@@ -41,6 +41,7 @@ export const orchestrateAnalyzeWriteSection = async (
     scenarioEntityNames?: string[];
   },
 ): Promise<AutoBeAnalyzeWriteSectionEvent> => {
+  const counter = new Singleton(() => ++props.progress.completed);
   const preliminary: AutoBePreliminaryController<"previousAnalysisSections"> =
     new AutoBePreliminaryController({
       application:
@@ -50,52 +51,56 @@ export const orchestrateAnalyzeWriteSection = async (
       state: ctx.state(),
       dispatch: (e) => ctx.dispatch(e),
     });
-  return await preliminary.orchestrate(ctx, async (out) => {
-    const pointer: IPointer<IAutoBeAnalyzeWriteSectionApplicationWrite | null> =
-      {
-        value: null,
-      };
-    const result: AutoBeContext.IResult = await ctx.conversate({
-      source: SOURCE,
-      controller: createController({
-        pointer,
-        preliminary,
-        scenarioEntityNames: props.scenarioEntityNames,
-      }),
-      enforceFunctionCall: true,
-      promptCacheKey: props.promptCacheKey,
-      ...transformAnalyzeWriteSectionHistory(ctx, {
-        scenario: props.scenario,
-        file: props.file,
-        moduleEvent: props.moduleEvent,
-        unitEvent: props.unitEvent,
-        allUnitEvents: props.allUnitEvents,
-        moduleIndex: props.moduleIndex,
-        unitIndex: props.unitIndex,
-        feedback: props.feedback,
-        preliminary,
-      }),
-    });
-    if (pointer.value === null) return out(result)(null);
+  const event: AutoBeAnalyzeWriteSectionEvent = await preliminary.orchestrate(
+    ctx,
+    async (out) => {
+      const pointer: IPointer<IAutoBeAnalyzeWriteSectionApplicationWrite | null> =
+        {
+          value: null,
+        };
+      const result: AutoBeContext.IResult = await ctx.conversate({
+        source: SOURCE,
+        controller: createController({
+          pointer,
+          preliminary,
+          scenarioEntityNames: props.scenarioEntityNames,
+        }),
+        enforceFunctionCall: true,
+        promptCacheKey: props.promptCacheKey,
+        ...transformAnalyzeWriteSectionHistory(ctx, {
+          scenario: props.scenario,
+          file: props.file,
+          moduleEvent: props.moduleEvent,
+          unitEvent: props.unitEvent,
+          allUnitEvents: props.allUnitEvents,
+          moduleIndex: props.moduleIndex,
+          unitIndex: props.unitIndex,
+          feedback: props.feedback,
+          preliminary,
+        }),
+      });
+      if (pointer.value === null) return out(result)(null);
 
-    const event: AutoBeAnalyzeWriteSectionEvent = {
-      type: SOURCE,
-      id: v7(),
-      moduleIndex: pointer.value.moduleIndex,
-      unitIndex: pointer.value.unitIndex,
-      sectionSections: pointer.value.sectionSections,
-      acquisition: preliminary.getAcquisition(),
-      tokenUsage: result.tokenUsage,
-      metric: result.metric,
-      step: (ctx.state().analyze?.step ?? -1) + 1,
-      total: props.progress.total,
-      completed: ++props.progress.completed,
-      retry: props.retry,
-      created_at: new Date().toISOString(),
-    };
-    ctx.dispatch(event);
-    return out(result)(event);
-  });
+      const event: AutoBeAnalyzeWriteSectionEvent = {
+        type: SOURCE,
+        id: v7(),
+        moduleIndex: pointer.value.moduleIndex,
+        unitIndex: pointer.value.unitIndex,
+        sectionSections: pointer.value.sectionSections,
+        acquisition: preliminary.getAcquisition(),
+        tokenUsage: result.tokenUsage,
+        metric: result.metric,
+        step: (ctx.state().analyze?.step ?? -1) + 1,
+        total: props.progress.total,
+        completed: counter.get(),
+        retry: props.retry,
+        created_at: new Date().toISOString(),
+      };
+      return out(result)(event);
+    },
+  );
+  ctx.dispatch(event);
+  return event;
 };
 
 function createController(props: {
