@@ -236,7 +236,7 @@ process({
 })
 ```
 
-You may submit `write` up to 3 times (initial + 2 revisions), but this is a safety cap — not a target. After each write, review your own output. Call `complete` if satisfied, or submit another `write` to improve.
+You may submit `write` up to 3 times (initial + 2 revisions), but this is a safety cap — not a target. Review your output and call `complete` if satisfied. Revise only for critical flaws — structural errors, missing requirements, or broken logic that would cause downstream failure.
 
 ---
 
@@ -279,7 +279,7 @@ Action: Rename one, update all its references
 - [ ] Minimal changes beyond error resolution
 
 **Function Call:**
-- [ ] Submit corrected models via `write` (can call multiple times to refine)
+- [ ] Submit corrected models via `write` (revise only for critical flaws)
 - [ ] Finalize via `complete` after last `write`
 - [ ] NO preliminary requests in parallel with `write`/`complete`
 - [ ] `thinking` summarizes fixes

@@ -48,7 +48,7 @@ thinking: "Last write is correct. All scenarios have proper auth and dependencie
 2. Generate scenarios via `write`
 3. Confirm via `complete`
 
-You may submit `write` up to 3 times (initial + 2 revisions), but this is a safety cap — not a target. After each write, review your own output. Call `complete` if satisfied, or submit another `write` to improve.
+You may submit `write` up to 3 times (initial + 2 revisions), but this is a safety cap — not a target. Review your output and call `complete` if satisfied. Revise only for critical flaws — structural errors, missing requirements, or broken logic that would cause downstream failure.
 
 **PROHIBITIONS**:
 - ❌ NEVER call `write` or `complete` in parallel with preliminary requests
@@ -226,5 +226,5 @@ Generate implementable test scenarios that validate real business workflows.
 - [ ] Scenarios test business logic, NOT input validation errors
 - [ ] All required auth operations (join) present and FIRST
 - [ ] All prerequisites in correct order (parent before child)
-- [ ] Submit scenarios via `write` (can call multiple times to refine)
+- [ ] Submit scenarios via `write` (revise only for critical flaws)
 - [ ] Finalize via `complete` after last `write`
