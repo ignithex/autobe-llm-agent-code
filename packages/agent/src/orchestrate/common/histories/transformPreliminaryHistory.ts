@@ -57,9 +57,13 @@ export const transformPreliminaryHistory = <Kind extends AutoBePreliminaryKind>(
     .flat();
 
   // sequence messages
-  const systems = histories.filter((h) => h.type === "systemMessage");
-  const others = histories.filter((h) => h.type !== "systemMessage");
-  const messages = [...systems, ...others];
+  const systems: IAgenticaHistoryJson.ISystemMessage[] = histories.filter(
+    (h) => h.type === "systemMessage",
+  );
+  const others: IMicroAgenticaHistoryJson[] = histories.filter(
+    (h) => h.type !== "systemMessage",
+  );
+  const messages: IMicroAgenticaHistoryJson[] = [...systems, ...others];
 
   // previous written value
   const previousWrite: Record<string, any> | null =
@@ -69,10 +73,7 @@ export const transformPreliminaryHistory = <Kind extends AutoBePreliminaryKind>(
       createFunctionCallingMessage({
         controller: preliminary.getSource(),
         kind: "write" as any,
-        arguments: {
-          thinking: "previous written value waiting for confirmation",
-          previousWrite,
-        },
+        arguments: previousWrite,
       }),
     );
   return messages;
@@ -80,7 +81,7 @@ export const transformPreliminaryHistory = <Kind extends AutoBePreliminaryKind>(
 
 namespace PreliminaryTransformer {
   export interface IProps<Kind extends AutoBePreliminaryKind> {
-    source: Exclude<AutoBeEventSource, "facade" | "preliminary">;
+    source: Exclude<AutoBeEventSource, "facade" | "preliminaryAcquire">;
     state: AutoBeState;
     all: Pick<IAutoBePreliminaryCollection, Kind>;
     local: Pick<IAutoBePreliminaryCollection, Kind>;
@@ -722,7 +723,7 @@ const formatCompactSectionIndex = (
 const createFunctionCallingMessage = <
   Kind extends AutoBePreliminaryKind,
 >(props: {
-  controller: Exclude<AutoBeEventSource, "facade" | "preliminary">;
+  controller: Exclude<AutoBeEventSource, "facade" | "preliminaryAcquire">;
   kind: Kind | "write";
   arguments: Record<string, any>;
 }): IAgenticaHistoryJson.IAssistantMessage | IAgenticaHistoryJson.IExecute => ({

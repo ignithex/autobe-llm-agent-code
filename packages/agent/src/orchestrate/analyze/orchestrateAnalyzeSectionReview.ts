@@ -21,7 +21,6 @@ import {
   IAutoBeAnalyzeSectionReviewApplicationComplete,
   IAutoBeAnalyzeSectionReviewApplicationProps,
 } from "./structures/IAutoBeAnalyzeSectionReviewApplication";
-import { repairSectionReviewInput } from "./utils/repairSectionReviewUtils";
 
 /**
  * Orchestrate per-module review of section content for a SINGLE module.
@@ -63,6 +62,7 @@ export const orchestrateAnalyzeSectionReview = async (
       source: SOURCE,
       kinds: ["previousAnalysisSections"],
       state: ctx.state(),
+      dispatch: (e) => ctx.dispatch(e),
     });
   return await preliminary.orchestrate(ctx, async (out) => {
     const pointer: IPointer<IAutoBeAnalyzeSectionReviewApplicationComplete | null> =
@@ -121,7 +121,6 @@ function createController(props: {
   const validate = (
     input: unknown,
   ): IValidation<IAutoBeAnalyzeSectionReviewApplicationProps> => {
-    input = repairSectionReviewInput(input);
     const result: IValidation<IAutoBeAnalyzeSectionReviewApplicationProps> =
       typia.validate<IAutoBeAnalyzeSectionReviewApplicationProps>(input);
     if (result.success === false || result.data.request.type === "write")

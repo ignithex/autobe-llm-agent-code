@@ -21,7 +21,6 @@ import {
   IAutoBeAnalyzeSectionCrossFileReviewApplicationProps,
   IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite,
 } from "./structures/IAutoBeAnalyzeSectionCrossFileReviewApplication";
-import { repairSectionReviewInput } from "./utils/repairSectionReviewUtils";
 
 /**
  * Orchestrate cross-file lightweight review of section metadata across ALL
@@ -60,6 +59,7 @@ export const orchestrateAnalyzeSectionCrossFileReview = async (
       source: SOURCE,
       kinds: ["previousAnalysisSections"],
       state: ctx.state(),
+      dispatch: (e) => ctx.dispatch(e),
     });
   return await preliminary.orchestrate(ctx, async (out) => {
     const pointer: IPointer<IAutoBeAnalyzeSectionCrossFileReviewApplicationWrite | null> =
@@ -113,7 +113,6 @@ function createController(props: {
   const validate = (
     input: unknown,
   ): IValidation<IAutoBeAnalyzeSectionCrossFileReviewApplicationProps> => {
-    input = repairSectionReviewInput(input);
     const result: IValidation<IAutoBeAnalyzeSectionCrossFileReviewApplicationProps> =
       typia.validate<IAutoBeAnalyzeSectionCrossFileReviewApplicationProps>(
         input,
