@@ -16,11 +16,7 @@ import { AutoBeContext } from "../../context/AutoBeContext";
 import { validateSectionSectionContent } from "../../utils/validateEnglishOnly";
 import { AutoBePreliminaryController } from "../common/AutoBePreliminaryController";
 import { transformAnalyzeWriteSectionPatchHistory } from "./histories/transformAnalyzeWriteSectionPatchHistory";
-import {
-  IAutoBeAnalyzeWriteSectionApplication,
-  IAutoBeAnalyzeWriteSectionApplicationProps,
-  IAutoBeAnalyzeWriteSectionApplicationWrite,
-} from "./structures/IAutoBeAnalyzeWriteSectionApplication";
+import { IAutoBeAnalyzeWriteSectionApplication } from "./structures/IAutoBeAnalyzeWriteSectionApplication";
 import { detectTechLockin } from "./utils/buildHardValidators";
 import { detectInventedEntities } from "./utils/detectInventedEntities";
 
@@ -42,20 +38,21 @@ export const orchestrateAnalyzeWriteSectionPatch = async (
     sectionIndices?: number[] | null;
   },
 ): Promise<AutoBeAnalyzeWriteSectionEvent> => {
-  const preliminary: AutoBePreliminaryController<"previousAnalysisSections"> =
-    new AutoBePreliminaryController({
-      application:
-        typia.json.application<IAutoBeAnalyzeWriteSectionApplication>(),
-      source: SOURCE,
-      kinds: ["previousAnalysisSections"],
-      state: ctx.state(),
-      dispatch: (e) => ctx.dispatch(e),
-    });
+  const preliminary: AutoBePreliminaryController<
+    "previousAnalysisSections" | "complete"
+  > = new AutoBePreliminaryController({
+    application:
+      typia.json.application<IAutoBeAnalyzeWriteSectionApplication>(),
+    source: SOURCE,
+    kinds: ["previousAnalysisSections", "complete"],
+    state: ctx.state(),
+    dispatch: (e) => ctx.dispatch(e),
+  });
   const counter = new Singleton(() => ++props.progress.completed);
   const event: AutoBeAnalyzeWriteSectionEvent = await preliminary.orchestrate(
     ctx,
     async (out) => {
-      const pointer: IPointer<IAutoBeAnalyzeWriteSectionApplicationWrite | null> =
+      const pointer: IPointer<IAutoBeAnalyzeWriteSectionApplication.IWrite | null> =
         {
           value: null,
         };
@@ -123,15 +120,17 @@ export const orchestrateAnalyzeWriteSectionPatch = async (
 };
 
 function createController(props: {
-  pointer: IPointer<IAutoBeAnalyzeWriteSectionApplicationWrite | null>;
-  preliminary: AutoBePreliminaryController<"previousAnalysisSections">;
+  pointer: IPointer<IAutoBeAnalyzeWriteSectionApplication.IWrite | null>;
+  preliminary: AutoBePreliminaryController<
+    "previousAnalysisSections" | "complete"
+  >;
   scenarioEntityNames?: string[];
 }): IAgenticaController.IClass {
   const validate = (
     input: unknown,
-  ): IValidation<IAutoBeAnalyzeWriteSectionApplicationProps> => {
-    const result: IValidation<IAutoBeAnalyzeWriteSectionApplicationProps> =
-      typia.validate<IAutoBeAnalyzeWriteSectionApplicationProps>(input);
+  ): IValidation<IAutoBeAnalyzeWriteSectionApplication.IProps> => {
+    const result: IValidation<IAutoBeAnalyzeWriteSectionApplication.IProps> =
+      typia.validate<IAutoBeAnalyzeWriteSectionApplication.IProps>(input);
     if (result.success === false) return result;
 
     // Validate English-only content for complete requests

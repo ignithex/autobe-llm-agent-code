@@ -70,6 +70,8 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
 
   // PAGINATION
   private analysisPageOffset: number = 0;
+
+  // COMPLETION TRACKING
   private previousWrites: IPreviousWrite[] = [];
   private completed: IPointer<boolean> = {
     value: false,
@@ -160,8 +162,8 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
    *   found.
    */
   public validate(
-    input: IAutoBePreliminaryRequest<Kind, true>,
-  ): IValidation<IAutoBePreliminaryRequest<Kind, true>> {
+    input: IAutoBePreliminaryRequest<Kind>,
+  ): IValidation<IAutoBePreliminaryRequest<Kind>> {
     return validatePreliminary(this, input);
   }
 
@@ -286,6 +288,7 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
         acquisition.previousInterfaceSchemas = Object.keys(
           local.previousInterfaceSchemas,
         );
+      else if (kind === "complete") acquisition.complete = false;
       else kind satisfies never;
     return acquisition as Pick<AutoBePreliminaryAcquisition, Kind>;
   }
@@ -390,13 +393,9 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
             (h) => h.type === "execute",
           );
           const history: AgenticaExecuteHistory | undefined = executes.find(
-            (h) => (h.arguments.request as any).type === "write",
+            (h) => (h.arguments.request as { type: "write" }).type === "write",
           );
-          if (history === undefined)
-            throw new Error("No write execute found in histories.");
-
-          // clear completion
-          this.completed.value = false;
+          if (history === undefined) continue;
 
           // store write result and raw arguments
           this.previousWrites.push({
@@ -418,7 +417,9 @@ export class AutoBePreliminaryController<Kind extends AutoBePreliminaryKind> {
           }
           if (
             this.previousWrites.length >=
-            AutoBeConfigConstant.PRELIMINARY_WRITE_LIMIT
+            (this.kinds.includes("complete" as Kind)
+              ? AutoBeConfigConstant.PRELIMINARY_WRITE_LIMIT
+              : 1)
           )
             break;
         } else {

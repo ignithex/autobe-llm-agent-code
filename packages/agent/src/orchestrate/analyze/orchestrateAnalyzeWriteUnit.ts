@@ -15,11 +15,7 @@ import { AutoBeContext } from "../../context/AutoBeContext";
 import { validateUnitSectionContent } from "../../utils/validateEnglishOnly";
 import { AutoBePreliminaryController } from "../common/AutoBePreliminaryController";
 import { transformAnalyzeWriteUnitHistory } from "./histories/transformAnalyzeWriteUnitHistory";
-import {
-  IAutoBeAnalyzeWriteUnitApplication,
-  IAutoBeAnalyzeWriteUnitApplicationProps,
-  IAutoBeAnalyzeWriteUnitApplicationWrite,
-} from "./structures/IAutoBeAnalyzeWriteUnitApplication";
+import { IAutoBeAnalyzeWriteUnitApplication } from "./structures/IAutoBeAnalyzeWriteUnitApplication";
 
 export const orchestrateAnalyzeWriteUnit = async (
   ctx: AutoBeContext,
@@ -35,19 +31,20 @@ export const orchestrateAnalyzeWriteUnit = async (
   },
 ): Promise<AutoBeAnalyzeWriteUnitEvent> => {
   const counter = new Singleton(() => ++props.progress.completed);
-  const preliminary: AutoBePreliminaryController<"previousAnalysisSections"> =
-    new AutoBePreliminaryController({
-      application: typia.json.application<IAutoBeAnalyzeWriteUnitApplication>(),
-      source: SOURCE,
-      kinds: ["previousAnalysisSections"],
-      state: ctx.state(),
-      dispatch: (e) => ctx.dispatch(e),
-    });
+  const preliminary: AutoBePreliminaryController<
+    "previousAnalysisSections" | "complete"
+  > = new AutoBePreliminaryController({
+    application: typia.json.application<IAutoBeAnalyzeWriteUnitApplication>(),
+    source: SOURCE,
+    kinds: ["previousAnalysisSections", "complete"],
+    state: ctx.state(),
+    dispatch: (e) => ctx.dispatch(e),
+  });
 
   const event: AutoBeAnalyzeWriteUnitEvent = await preliminary.orchestrate(
     ctx,
     async (out) => {
-      const pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationWrite | null> =
+      const pointer: IPointer<IAutoBeAnalyzeWriteUnitApplication.IWrite | null> =
         {
           value: null,
         };
@@ -92,14 +89,16 @@ export const orchestrateAnalyzeWriteUnit = async (
 };
 
 function createController(props: {
-  pointer: IPointer<IAutoBeAnalyzeWriteUnitApplicationWrite | null>;
-  preliminary: AutoBePreliminaryController<"previousAnalysisSections">;
+  pointer: IPointer<IAutoBeAnalyzeWriteUnitApplication.IWrite | null>;
+  preliminary: AutoBePreliminaryController<
+    "previousAnalysisSections" | "complete"
+  >;
 }): IAgenticaController.IClass {
   const validate = (
     input: unknown,
-  ): IValidation<IAutoBeAnalyzeWriteUnitApplicationProps> => {
-    const result: IValidation<IAutoBeAnalyzeWriteUnitApplicationProps> =
-      typia.validate<IAutoBeAnalyzeWriteUnitApplicationProps>(input);
+  ): IValidation<IAutoBeAnalyzeWriteUnitApplication.IProps> => {
+    const result: IValidation<IAutoBeAnalyzeWriteUnitApplication.IProps> =
+      typia.validate<IAutoBeAnalyzeWriteUnitApplication.IProps>(input);
     if (result.success === false) return result;
 
     // Validate English-only content for complete requests

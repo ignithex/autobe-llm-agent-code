@@ -25,13 +25,9 @@ interface IProgrammer {
       | "previousAnalysisSections"
       | "previousDatabaseSchemas"
       | "previousInterfaceOperations"
+      | "complete"
     >;
   }): IAutoBeOrchestrateHistory;
-  review(next: {
-    group: AutoBeInterfaceGroup;
-    designs: AutoBeInterfaceEndpointDesign[];
-    promptCacheKey: string;
-  }): Promise<AutoBeInterfaceEndpointDesign[]>;
 }
 
 export const orchestrateInterfaceEndpointOverall = async (
@@ -60,14 +56,7 @@ export const orchestrateInterfaceEndpointOverall = async (
         counter.get();
         throw error;
       }
-      for (let i: number = 0; i < 2; ++i)
-        try {
-          designs = await props.programmer.review({
-            group,
-            designs,
-            promptCacheKey: promptCacheKey + "_review",
-          });
-        } catch {}
+      // review removed — write agents self-review during rewrite loop
       return designs;
     }),
   );
