@@ -589,7 +589,8 @@ AutoBE's risk is different. "The LLM generates incorrect code." It doesn't touch
 Gate 1: Typia schema validation (Function Calling output)
 Gate 2: Database Compiler (FK integrity, circular references, reserved words)
 Gate 3: OpenAPI Interface Compiler (spec consistency, DB cross-validation)
-Gate 4: TypeScript Compiler (strict mode, incremental compilation, ESLint)
+Gate 4: Test Compiler (expression validation, scenario consistency)
+Gate 5: Hybrid Compiler (TypeScript compiler + partial AST)
 ```
 
 Building firewalls versus building a structure where fire can't start in the first place. Different threat models demand different defense strategies.
@@ -660,7 +661,7 @@ Where AutoBE's `executeCachedBatch` hardcodes "what to parallelize" into the cod
 | **Agent lifetime** | Persists for entire session | Created per task -> discarded |
 | **Context management** | 4-tier post-hoc compression | 48 History Transformers, pre-selection |
 | **Validation** | LSP diagnostics + user confirmation | 4-stage compiler + self-healing (up to 4 rounds) |
-| **Safety** | 23 security checks + ML classifier + sandbox | 4-gate compiler gates |
+| **Safety** | 23 security checks + ML classifier + sandbox | 5-gate compiler gates |
 | **Parallel execution** | LLM judgment (Coordinator) | `executeCachedBatch` (deterministic) |
 | **Cache strategy** | `DYNAMIC_BOUNDARY` split | Message-order-based optimization |
 | **Model independence** | Claude API dependent | Works with any LLM |
@@ -703,7 +704,7 @@ When creating a new tool, the defaults are `isConcurrencySafe: false`, `isReadOn
 
 #### 7.2.4. Specificity of the Threat Model
 
-Each of the 23 security check categories has a clear answer to "what does this prevent?" Shell metacharacter injection, IFS variable manipulation, process environment access, Unicode whitespace disguises, control character insertion — each category addresses a specific threat. The depth of this documentation inspired us to begin documenting exactly which vulnerability each of our 4-Gate compilers prevents.
+Each of the 23 security check categories has a clear answer to "what does this prevent?" Shell metacharacter injection, IFS variable manipulation, process environment access, Unicode whitespace disguises, control character insertion — each category addresses a specific threat. The depth of this documentation inspired us to begin documenting exactly which vulnerability each of our 5-gate compilers prevents.
 
 #### 7.2.5. Context Collapse's "Read-Time Projection"
 
