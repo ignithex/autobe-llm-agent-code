@@ -3,13 +3,19 @@ export {
   scoreToGrade,
   createEmptyPhaseResult,
   generateExplanation,
+} from "./score-utils";
+export {
   PHASE_WEIGHTS,
   PHASE_NAMES,
   GATE_ERROR_THRESHOLD,
   GATE_PENALTY_PER_PERCENT,
+  GATE_MULTIPLIER_FLOOR,
+  TYPE_CRITICAL_RATIO,
+  PRISMA_PENALTY_CAP,
+  MAX_COMBINED_PENALTY,
   AGENT_WEIGHT_RATIO,
   AGENT_WEIGHTS,
-} from "./score";
+} from "./constants";
 
 export type {
   Severity,
@@ -33,6 +39,13 @@ export type {
   EvaluationPenalties,
   ScoreBreakdown,
 } from "./score";
+export type {
+  FixAdvice,
+  FixAdvisory,
+  FixAdviceSource,
+  CodeSnippet,
+  PenaltyRecovery,
+} from "./fix-advice";
 export type {
   EvaluationContext,
   EvaluationInput,
