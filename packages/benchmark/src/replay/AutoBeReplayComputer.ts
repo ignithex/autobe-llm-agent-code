@@ -21,24 +21,25 @@ export namespace AutoBeReplayComputer {
     a: IAutoBePlaygroundBenchmark,
     b: IAutoBePlaygroundBenchmark,
   ): number => {
-    if (b.score.aggregate !== a.score.aggregate)
-      return b.score.aggregate - a.score.aggregate;
+    const x: number = a.score.aggregate;
+    const y: number = b.score.aggregate;
+    if (y !== x) return y - x;
     return compareVendors(a.vendor, b.vendor);
   };
 
   export const compareVendors = (a: string, b: string): number => {
-    const pa = a.split("-");
-    const pb = b.split("-");
-    const len = Math.max(pa.length, pb.length);
-    for (let i = 0; i < len; i++) {
-      const ra = pa[i] ?? "";
-      const rb = pb[i] ?? "";
-      const na = parsePart(ra);
-      const nb = parsePart(rb);
+    const pa: string[] = a.split("-");
+    const pb: string[] = b.split("-");
+    const len: number = Math.max(pa.length, pb.length);
+    for (let i: number = 0; i < len; i++) {
+      const ra: string = pa[i] ?? "";
+      const rb: string = pb[i] ?? "";
+      const na: number | null = parsePart(ra);
+      const nb: number | null = parsePart(rb);
       if (na !== null && nb !== null) {
         if (na !== nb) return nb - na;
       } else {
-        const cmp = ra.localeCompare(rb);
+        const cmp: number = ra.localeCompare(rb);
         if (cmp !== 0) return cmp;
       }
     }
@@ -54,12 +55,18 @@ export namespace AutoBeReplayComputer {
     );
 
     const individual = (project: AutoBeExampleProject): number => {
-      const found = summaries.find((s) => s.project === project);
+      const found: IAutoBePlaygroundReplay.ISummary | undefined =
+        summaries.find((s) => s.project === project);
       if (found === undefined) return 0;
       return compute(found);
     };
     return {
-      aggregate: round(summaries.map(compute).reduce((a, b) => a + b, 0) / 4),
+      aggregate: round(
+        summaries
+          .map(compute)
+          .filter((x) => x !== null)
+          .reduce((a, b) => a + b, 0) / 4,
+      ),
       todo: individual("todo"),
       reddit: individual("reddit"),
       shopping: individual("shopping"),
@@ -190,23 +197,33 @@ const parsePart = (s: string): number | null => {
   else if (s.endsWith("b")) t = s.slice(0, -1);
   else t = s;
   if (t === "") return null;
-  const n = Number(t);
+  const n: number = Number(t);
   return isNaN(n) ? null : n;
 };
 
 const compute = (summary: IAutoBePlaygroundReplay.ISummary): number => {
   const getScore = (phase: AutoBePhase): number => {
-    const state = summary[phase];
-    if (state === null) return 0;
+    const state: IAutoBePlaygroundReplay.IPhaseState | null = summary[phase];
+    if (!state) return 0;
 
-    const [success, failure] = FORMULA[phase];
+    const [success, failure]: [
+      number,
+      (commodity: Record<string, number>) => number,
+    ] = FORMULA[phase];
     return state.success === true
       ? success
       : success * failure(state.commodity);
   };
-  return round(sum(typia.misc.literals<AutoBePhase>().map(getScore)));
+  return round(
+    sum(
+      typia.misc
+        .literals<AutoBePhase>()
+        .map(getScore)
+        .filter((x) => x !== null && Number.isFinite(x)),
+    ),
+  );
 };
-const round = (value: number) => Math.round(value * 100) / 100;
+const round = (value: number): number => Math.round(value * 100) / 100;
 const sum = (targets: number[]): number => targets.reduce((a, b) => a + b, 0);
 
 // for type safety
